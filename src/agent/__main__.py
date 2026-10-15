@@ -14,7 +14,7 @@ from agent.collectors.dart import DartClient
 from agent.collectors.prices import MarketData
 from agent.config import load_holdings, load_settings, today_kst
 from agent.delivery.email import send_email
-from agent.report.context import ContextError, build_context
+from agent.report.context import build_context
 from agent.report.render import render_report
 from agent.report.schema import Context
 from agent.report.validate import validate_analysis
@@ -64,14 +64,21 @@ def cmd_publish(args) -> Path:
     return preview
 
 
+def _subject_prefix(args) -> str:
+    try:
+        return load_settings(args.config_dir / "settings.yaml").report_subject_prefix
+    except Exception:
+        return "[투자 리포트]"
+
+
 def cmd_run(args) -> None:
+    """예약 실행용. 어떤 오류든 실패 메일을 보내서 '조용히 안 오는' 날이 없게 한다."""
     try:
         cmd_collect(args)
-    except ContextError as e:
+    except Exception as e:
         if not args.dry_run:
-            settings = load_settings(args.config_dir / "settings.yaml")
-            send_email(f"{settings.report_subject_prefix} {args.date} 생성 실패",
-                       f"<p>오늘 리포트를 만들지 못했습니다: {escape(str(e))}</p>")
+            send_email(f"{_subject_prefix(args)} {args.date} 생성 실패",
+                       f"<p>오늘 리포트를 만들지 못했습니다: {escape(f'{type(e).__name__}: {e}')}</p>")
         raise
     cmd_publish(args)
 
