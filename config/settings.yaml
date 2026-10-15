@@ -13,4 +13,4 @@ min_band_points: 36
 disclosure_days: 7
 report_subject_prefix: "[투자 리포트]"
 # 나무 잔고에서 "지수" 자산군으로 분류할 종목코드 (지수 추종 ETF 등). 예: ["IVV", "360750"]
-index_tickers: []
+index_tickers: ["IVV", "VOO", "SPY", "QQQ", "VTI", "360750", "133690"]
