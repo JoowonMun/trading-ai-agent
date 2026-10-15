@@ -1,22 +1,24 @@
 """테스트 데이터 생성기."""
 
 
-def report_rows(rev_cum, op_cum, ni_cum, equity_owners=None, equity_total=None, liabilities=None, *, with_add=True):
-    """DART fnlttSinglAcntAll 응답의 list 항목 모양을 흉내낸다."""
+def report_rows(rev, op, ni, equity_owners=None, equity_total=None, liabilities=None, *, add=None):
+    """DART fnlttSinglAcntAll 응답의 list 항목 모양을 흉내낸다.
 
-    def flow(account_id, name, cum):
-        row = {"sj_div": "IS", "account_id": account_id, "account_nm": name}
-        if with_add:
-            row["thstrm_amount"] = "999"  # 3개월치 값 — 누적값이 있으면 쓰이면 안 된다
-            row["thstrm_add_amount"] = f"{cum:,.0f}"
-        else:
-            row["thstrm_amount"] = f"{cum:,.0f}"
+    rev/op/ni는 thstrm_amount(분기·반기 보고서는 3개월치, 사업보고서는 연간),
+    add는 thstrm_add_amount(연초부터 누적) 3개 튜플 또는 None(필드 없음).
+    """
+
+    def flow(account_id, name, amount, cumulative):
+        row = {"sj_div": "IS", "account_id": account_id, "account_nm": name, "thstrm_amount": f"{amount:,.0f}"}
+        if cumulative is not None:
+            row["thstrm_add_amount"] = f"{cumulative:,.0f}"
         return row
 
+    adds = add or (None, None, None)
     rows = [
-        flow("ifrs-full_Revenue", "매출액", rev_cum),
-        flow("dart_OperatingIncomeLoss", "영업이익", op_cum),
-        flow("ifrs-full_ProfitLossAttributableToOwnersOfParent", "지배기업의 소유주에게 귀속되는 당기순이익", ni_cum),
+        flow("ifrs-full_Revenue", "매출액", rev, adds[0]),
+        flow("dart_OperatingIncomeLoss", "영업이익", op, adds[1]),
+        flow("ifrs-full_ProfitLossAttributableToOwnersOfParent", "지배기업의 소유주에게 귀속되는 당기순이익", ni, adds[2]),
     ]
     for account_id, name, value in (
         ("ifrs-full_EquityAttributableToOwnersOfParent", "지배기업의 소유주에게 귀속되는 자본", equity_owners),
@@ -79,9 +81,13 @@ class FakeDart:
         out = {}
         for y in range(self.today.year - years, self.today.year + 1):
             for q in range(1, 5):
-                if quarter_end(y, q) <= self.today:
-                    out[(y, q)] = report_rows(q * 100e9, q * 10e9, q * 8e9, equity_owners=200e9,
-                                              equity_total=250e9, liabilities=100e9, with_add=q < 4)
+                if quarter_end(y, q) > self.today:
+                    continue
+                bs = dict(equity_owners=200e9, equity_total=250e9, liabilities=100e9)
+                if q < 4:
+                    out[(y, q)] = report_rows(100e9, 10e9, 8e9, add=(q * 100e9, q * 10e9, q * 8e9), **bs)
+                else:
+                    out[(y, q)] = report_rows(400e9, 40e9, 32e9, **bs)
         return out
 
     def shares_outstanding(self, corp_code):

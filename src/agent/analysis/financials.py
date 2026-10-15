@@ -62,61 +62,72 @@ def _normalize(name: str) -> str:
     return name.replace(" ", "")
 
 
-def _find(rows, sj_divs, ids, names, getter):
-    candidates = [r for div in sj_divs for r in rows if r.get("sj_div") == div]
+def _has_amount(row) -> bool:
+    return (parse_amount(row.get("thstrm_amount")) is not None
+            or parse_amount(row.get("thstrm_add_amount")) is not None)
+
+
+def _find_row(rows, sj_divs, ids, names) -> dict | None:
+    candidates = [r for div in sj_divs for r in rows if r.get("sj_div") == div and _has_amount(r)]
     for account_id in ids:
         for r in candidates:
             if r.get("account_id") == account_id:
-                value = getter(r)
-                if value is not None:
-                    return value
-    wanted = [_normalize(n) for n in names]
-    for name in wanted:
+                return r
+    for name in (_normalize(n) for n in names):
         for r in candidates:
             if _normalize(r.get("account_nm", "")) == name:
-                value = getter(r)
-                if value is not None:
-                    return value
+                return r
     return None
 
 
-def _cumulative(row):
-    value = parse_amount(row.get("thstrm_add_amount"))
-    return value if value is not None else parse_amount(row.get("thstrm_amount"))
-
-
-def _period_end_value(row):
-    return parse_amount(row.get("thstrm_amount"))
-
-
 def extract_report(rows: list[dict]) -> dict[str, float | None]:
+    """손익 항목은 `<key>_amt`(thstrm_amount)와 `<key>_add`(thstrm_add_amount)를 따로 돌려준다.
+
+    DART 정의: 분기·반기 보고서의 손익 thstrm_amount는 3개월치, thstrm_add_amount는 연초부터 누적.
+    사업보고서(4분기)의 thstrm_amount는 연간 합계.
+    """
     out = {}
     for key, (ids, names) in FLOW_ACCOUNTS.items():
-        out[key] = _find(rows, ("IS", "CIS"), ids, names, _cumulative)
+        row = _find_row(rows, ("IS", "CIS"), ids, names) or {}
+        out[f"{key}_amt"] = parse_amount(row.get("thstrm_amount"))
+        out[f"{key}_add"] = parse_amount(row.get("thstrm_add_amount"))
     for key, (ids, names) in STOCK_ACCOUNTS.items():
-        out[key] = _find(rows, ("BS",), ids, names, _period_end_value)
+        row = _find_row(rows, ("BS",), ids, names) or {}
+        out[key] = parse_amount(row.get("thstrm_amount"))
     return out
+
+
+def _flow_and_cumulative(quarter: int, amt, add, prev_cum):
+    """(해당 분기 3개월치, 연초부터 누적)."""
+    if quarter == 4:
+        cum = add if add is not None else amt
+        flow = cum - prev_cum if cum is not None and prev_cum is not None else None
+        return flow, cum
+    flow = amt if amt is not None else (add - prev_cum if add is not None and prev_cum is not None else None)
+    if add is not None:
+        cum = add
+    elif quarter == 1:
+        cum = amt
+    else:
+        cum = prev_cum + amt if prev_cum is not None and amt is not None else None
+    return flow, cum
 
 
 def build_quarters(reports: dict[tuple[int, int], list[dict]]) -> list[QuarterFigures]:
     extracted = {k: extract_report(v) for k, v in reports.items()}
+    cumulative: dict[tuple[int, int], dict[str, float | None]] = {}
     result = []
     for year, quarter in sorted(extracted):
         cur = extracted[(year, quarter)]
-        prev = extracted.get((year, quarter - 1)) if quarter > 1 else None
-
-        def flow(key):
-            if cur[key] is None:
-                return None
-            if quarter == 1:
-                return cur[key]
-            if prev is None or prev[key] is None:
-                return None
-            return cur[key] - prev[key]
-
+        prev_cum = cumulative.get((year, quarter - 1), {})
+        flows, cums = {}, {}
+        for key in FLOW_ACCOUNTS:
+            flows[key], cums[key] = _flow_and_cumulative(quarter, cur[f"{key}_amt"], cur[f"{key}_add"],
+                                                         prev_cum.get(key))
+        cumulative[(year, quarter)] = cums
         result.append(QuarterFigures(
             year=year, quarter=quarter,
-            revenue=flow("revenue"), op_income=flow("op"), net_income=flow("ni"),
+            revenue=flows["revenue"], op_income=flows["op"], net_income=flows["ni"],
             equity_owners=cur["equity_owners"], equity_total=cur["equity_total"], liabilities=cur["liabilities"],
         ))
     return result
