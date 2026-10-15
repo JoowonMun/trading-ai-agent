@@ -42,6 +42,8 @@ def resolve_holdings(settings: Settings, manual: Holdings, notes: list[str], nh_
         synced, cash = nh_factory().holdings(index_tickers=set(settings.index_tickers))
     except Exception as e:
         log.warning("나무 잔고 조회 실패: %s", e)
+        if not manual.accounts:
+            raise RuntimeError(f"나무 잔고 조회에 실패했고 holdings.yaml에도 보유 종목이 없습니다: {e}") from e
         notes.append(f"나무 잔고 조회 실패 → holdings.yaml 사용 ({type(e).__name__})")
         return manual
     notes.append(f"나무 잔고 자동 조회: {sum(len(a.positions) for a in synced)}종목")

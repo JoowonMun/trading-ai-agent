@@ -126,3 +126,17 @@ def test_context_notes_appear_in_report(tmp_path):
     ctx = sample_context()
     ctx.notes = ["나무 잔고 조회 실패 → holdings.yaml 사용"]
     assert "나무 잔고 조회 실패" in render_report(ctx, None, [])
+
+
+def test_nh_failure_with_no_manual_holdings_raises_clear_error(monkeypatch):
+    import pytest
+    from agent.config import Holdings, Settings
+    monkeypatch.setenv("NH_APP_KEY", "k")
+    monkeypatch.setenv("NH_APP_SECRET", "s")
+
+    class BrokenNh:
+        def holdings(self, index_tickers):
+            raise RuntimeError("HTTP 500")
+
+    with pytest.raises(RuntimeError, match="보유 종목이 없습니다"):
+        cli.resolve_holdings(Settings(), Holdings(accounts=[]), [], nh_factory=lambda: BrokenNh())
