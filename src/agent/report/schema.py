@@ -134,6 +134,7 @@ class Context(BaseModel):
     nps_changes: list[dict] = []
     watchlist: list[dict] = []
     glossary_terms: list[str] = []
+    notes: list[str] = []
 
 
 class IndicatorNote(BaseModel):

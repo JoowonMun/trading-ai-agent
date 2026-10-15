@@ -78,3 +78,19 @@ def test_context_round_trips_as_json():
     from agent.report.schema import Context
     ctx = build()
     assert Context.model_validate_json(ctx.model_dump_json()) == ctx
+
+
+def test_ticker_not_in_dart_is_noted_not_failed():
+    from agent.collectors.dart import NotInDart
+
+    class EtfDart(FakeDart):
+        def corp_code(self, ticker):
+            if ticker == "0189B0":
+                raise NotInDart("없음")
+            return super().corp_code(ticker)
+
+    h = Holdings(accounts=[Account(name="a", broker="nh", market="KR", asset_class="domestic",
+                                   positions=[Position(ticker="0189B0", name="TIGER 은액티브", qty=1, avg_price=1)])])
+    etf = build(dart=EtfDart(TODAY), h=h).holdings[0]
+    assert etf.signal is None and etf.price is not None
+    assert etf.missing == ["ETF·펀드 등 개별 기업이 아니라 재무 분석 대상이 아닙니다"]

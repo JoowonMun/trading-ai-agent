@@ -11,8 +11,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from agent.collectors.dart import DartClient
+from agent.collectors.nh import NhClient
 from agent.collectors.prices import MarketData
-from agent.config import load_holdings, load_settings, today_kst
+from agent.config import Holdings, Settings, combine_holdings, load_holdings, load_settings, today_kst
 from agent.delivery.email import send_email
 from agent.report.context import build_context
 from agent.report.render import render_report
@@ -26,11 +27,34 @@ def _day_dir(args) -> Path:
     return args.out / args.date.isoformat()
 
 
+def _nh_client() -> NhClient:
+    return NhClient(os.environ["NH_APP_KEY"], os.environ["NH_APP_SECRET"], cache_dir=Path(".cache/nh"))
+
+
+def resolve_holdings(settings: Settings, manual: Holdings, notes: list[str], nh_factory=_nh_client) -> Holdings:
+    """나무 키가 있으면 나무 잔고를 자동으로 가져와 holdings.yaml의 나무 계좌를 대체한다.
+
+    실패하면 holdings.yaml 그대로 진행하고 리포트에 남긴다.
+    """
+    if not (os.environ.get("NH_APP_KEY") and os.environ.get("NH_APP_SECRET")):
+        return manual
+    try:
+        synced, cash = nh_factory().holdings(index_tickers=set(settings.index_tickers))
+    except Exception as e:
+        log.warning("나무 잔고 조회 실패: %s", e)
+        notes.append(f"나무 잔고 조회 실패 → holdings.yaml 사용 ({type(e).__name__})")
+        return manual
+    notes.append(f"나무 잔고 자동 조회: {sum(len(a.positions) for a in synced)}종목")
+    return combine_holdings(manual, synced, cash)
+
+
 def cmd_collect(args) -> Path:
     settings = load_settings(args.config_dir / "settings.yaml")
-    holdings = load_holdings(args.config_dir / "holdings.yaml")
+    notes: list[str] = []
+    holdings = resolve_holdings(settings, load_holdings(args.config_dir / "holdings.yaml"), notes)
     dart = DartClient(os.environ["DART_API_KEY"], cache_dir=Path(".cache/dart"), today=args.date)
     context = build_context(settings, holdings, MarketData(), dart, args.date)
+    context.notes = notes
     day = _day_dir(args)
     day.mkdir(parents=True, exist_ok=True)
     path = day / "context.json"

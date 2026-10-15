@@ -375,3 +375,25 @@ cash_krw: 0
 - **TTM 기반 PER 밴드의 한계**: 실적이 급변하는 종목(턴어라운드, 적자 전환)은 가격이 왜곡될 수 있음. 리포트에 계산 방식과 한계를 함께 표시
 - **국민연금 데이터 지연**: 국내 전체 목록은 연 1회, 13F는 약 45일 지연. 리포트에 기준일 명시
 - **나무 PLUG 세부 사양**: 모의투자 지원 여부 등 5단계 착수 시 확인. 대안은 한국투자증권 KIS API
+
+## 13. 증권사 연동: NH 나무 플러그 (2026-10-15 추가)
+
+- 명세: `https://www.nhplug.com/openapi-docs/{common,krstock,gbstock}/openapi.json`, 공식 SDK `github.com/PLUG-OpenAPI/nhplug-sdk`
+- 인증: `POST https://api.nhplug.com:8443/oauth2/token` (query: appkey, appsecretkey, grant_type=client_credentials, scope=oob). 토큰 24시간 유효, **재발급마다 NH 보안 알림 1건** → `.cache/nh/token.json`에 캐시
+- 호출: `POST {base}{path}`, body `{"Input_0": {...}}`, 헤더 `x-client-id`(앱키)·`x-client-secret`·`authorization: Bearer`. 초당 5회 한도
+- 운영 도메인 `api.nhplug.com:8443`, 모의투자 `moapi.nhplug.com:8443`(토큰은 운영에서만 발급). 계좌구분 01·02 = 실계좌, 03 = 모의투자 계좌
+
+### 현재 사용 (조회 전용, `collectors/nh.py`)
+| API | 용도 |
+|---|---|
+| `/n2/acctinfo` | 계좌 목록 |
+| `/krstock/inquiry/v1/balance` | 국내 잔고: `iem_cd`, `iem_nm`, `itg_bnc_qty`, `phs_pr`(1주 매입가, 실측 확인), `Output_0.dca`(예수금) |
+| `/gbstock/inquiry/v1/balance` | 해외 잔고(미국 200/USD): `iem_cd`, `cns_bse_bnc_qty`, `fc_avg_phs_pr` |
+
+- `ALLOWED_PATHS` 밖의 경로는 요청 전에 차단한다. 나무 계좌는 `holdings.yaml`의 `broker: nh` 계좌를 대체하고, API가 없는 계좌는 yaml 수동 입력 유지. 실패 시 yaml로 진행하고 리포트 "실행 메모"에 표시
+- `settings.yaml`의 `index_tickers`에 적은 종목은 "지수" 자산군으로 분류
+- DART에 없는 종목(ETF 등)은 재무 분석 없이 시세·비중만 표시
+
+### 나중 참고: 자동매매(5단계)용 주문 API — 현재 미사용
+국내 `/krstock/order/v1/` `cashBuy`·`cashSell`·`creditBuy`·`creditSell`·`modify`·`cancel`·`reservedOrder`·`reservedCancel` / 해외 `/gbstock/order/v1/` `buy`·`sell`·`modify`·`cancel`·`reservedSubmit`·`reservedCancel`.
+자동매매 착수 시: 모의투자 도메인과 03 계좌로 먼저 검증, 주문 전 직전 응답의 `rsp_msg` 확인(SDK 권고: `rsp_cd` 단일 비교로 성공 판정 금지), 주문 경로는 별도 허용 목록·금액 상한·사용자 확인 단계를 둔다.

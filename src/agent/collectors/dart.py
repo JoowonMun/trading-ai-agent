@@ -19,6 +19,10 @@ class DartError(RuntimeError):
     pass
 
 
+class NotInDart(DartError):
+    """DART 고유번호 목록에 없는 종목 (ETF·ETN·펀드 등)."""
+
+
 def disclosure_url(rcept_no: str) -> str:
     return f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}"
 
@@ -66,7 +70,7 @@ class DartClient:
         try:
             return self._corp_codes[stock_code]
         except KeyError:
-            raise DartError(f"DART에서 종목코드 {stock_code}를 찾을 수 없습니다") from None
+            raise NotInDart(f"DART에서 종목코드 {stock_code}를 찾을 수 없습니다") from None
 
     def company(self, corp_code: str) -> dict:
         return self._get_json("company.json", corp_code=corp_code) or {}

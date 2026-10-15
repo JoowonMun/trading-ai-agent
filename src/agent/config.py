@@ -27,6 +27,8 @@ class Settings(BaseModel):
     min_band_points: int = 36
     disclosure_days: int = 7
     report_subject_prefix: str = "[투자 리포트]"
+    # 나무 잔고에서 가져온 종목 중 "지수" 자산군으로 분류할 종목코드 (예: IVV, 360750)
+    index_tickers: list[str] = []
 
     @model_validator(mode="after")
     def _allocation_sums_to_100(self):
@@ -79,6 +81,12 @@ def load_holdings(path: Path) -> Holdings:
             f"{path}가 없습니다. config/holdings.example.yaml을 복사해 {Path(path).name}로 저장하고 "
             "실제 보유 종목을 적어주세요 (이 파일은 git에 올라가지 않습니다).")
     return Holdings.model_validate(_read_yaml(path))
+
+
+def combine_holdings(manual: Holdings, synced: list[Account], synced_cash: float) -> Holdings:
+    """나무에서 자동으로 가져온 계좌로 holdings.yaml의 나무(broker: nh) 계좌를 대체한다."""
+    others = [a for a in manual.accounts if a.broker != "nh"]
+    return Holdings(accounts=[*synced, *others], cash_krw=manual.cash_krw + synced_cash)
 
 
 def today_kst(now: datetime | None = None) -> date:

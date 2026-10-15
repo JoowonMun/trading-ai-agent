@@ -72,3 +72,23 @@ def test_personal_holdings_file_is_git_ignored():
     import subprocess
     result = subprocess.run(["git", "check-ignore", "-q", "config/holdings.yaml"])
     assert result.returncode == 0
+
+
+def test_combine_holdings_replaces_manual_nh_accounts():
+    from agent.config import Account, Holdings, Position, combine_holdings
+    manual = Holdings(cash_krw=500, accounts=[
+        Account(name="나무 국내(수동)", broker="nh", market="KR", asset_class="domestic",
+                positions=[Position(ticker="000001", qty=1, avg_price=1)]),
+        Account(name="다른 증권사 계좌", broker="mirae", market="KR", asset_class="index", analyze=False,
+                positions=[Position(ticker="360750", qty=1, avg_price=1)]),
+    ])
+    synced = [Account(name="나무 국내", broker="nh", market="KR", asset_class="domestic",
+                      positions=[Position(ticker="005930", qty=2, avg_price=1)])]
+    h = combine_holdings(manual, synced, synced_cash=1000)
+    assert [a.name for a in h.accounts] == ["나무 국내", "다른 증권사 계좌"]
+    assert h.cash_krw == 1500
+
+
+def test_settings_index_tickers_default_empty():
+    from agent.config import Settings
+    assert Settings().index_tickers == []

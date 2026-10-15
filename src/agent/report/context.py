@@ -12,7 +12,7 @@ from agent.analysis.indicators import moving_average, position_in_52w, rsi
 from agent.analysis.portfolio import AggregatedPosition, aggregate_positions, summarize, value_positions
 from agent.analysis.signals import decide_signal
 from agent.analysis.valuation import band_valuation, choose_method, is_financial, monthly_multiples
-from agent.collectors.dart import disclosure_url
+from agent.collectors.dart import NotInDart, disclosure_url
 from agent.config import Holdings, Settings
 from agent.report.schema import (Context, Disclosure, Flows, HoldingContext, IndexQuote, Market, PositionInfo,
                                  PriceSnapshot)
@@ -131,6 +131,8 @@ def build_context(settings: Settings, holdings: Holdings, market, dart, today: d
             continue
         try:
             _analyze_kr(h, series[p.key], market, dart, settings, today)
+        except NotInDart:
+            h.missing.append("ETF·펀드 등 개별 기업이 아니라 재무 분석 대상이 아닙니다")
         except Exception as e:
             log.warning("분석 실패 %s: %s", p.key, e)
             h.missing.append(f"분석: {e}")
