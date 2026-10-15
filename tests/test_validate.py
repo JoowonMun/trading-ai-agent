@@ -59,6 +59,24 @@ def test_schema_error():
     assert result is None and errors[0].startswith("스키마")
 
 
+def test_korean_unit_multipliers_are_checked():
+    assert validate_analysis(analysis(headline="현재가 6.5만원"), sample_context())[1] == []
+    _, errors = validate_analysis(analysis(headline="목표가 7.5만원"), sample_context())
+    assert any("7.5만원" in e for e in errors)
+    _, errors = validate_analysis(analysis(headline="순이익 5조원"), sample_context())
+    assert any("5조원" in e for e in errors)
+
+
+def test_number_from_another_holding_rejected():
+    _, errors = validate_analysis(analysis(headline="현재가 $230.50"), sample_context())  # AAPL 가격
+    assert any("230.50" in e for e in errors)
+
+
+def test_profile_numbers_only_allowed_as_percent():
+    _, errors = validate_analysis(analysis(reasoning="PER 15배라 적정"), sample_context())
+    assert any("15배" in e for e in errors)
+
+
 def test_numbers_without_unit_are_ignored():
     _, errors = validate_analysis(analysis(reasoning="2026년 들어 5일 연속 상승"), sample_context())
     assert errors == []
