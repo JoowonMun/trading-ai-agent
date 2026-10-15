@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>{{ title }}</title></head>
+<body style="margin:0;padding:16px;background:#f5f5f4;font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;color:#1c1917;line-height:1.6;">
+<div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:8px;padding:24px;">
+
+<h1 style="font-size:20px;margin:0 0 4px;">{{ title }}</h1>
+<p style="color:#78716c;margin:0 0 20px;font-size:13px;">성향: 균형형 · {{ "AI 분석 포함" if analysis else "숫자 리포트" }}</p>
+
+<h2 style="font-size:16px;border-bottom:1px solid #e7e5e4;padding-bottom:4px;">오늘의 요약</h2>
+<ul>{% for line in summary %}<li>{{ line }}</li>{% endfor %}</ul>
+
+{% if context.market.indices or context.market.fx_usdkrw %}
+<h2 style="font-size:16px;border-bottom:1px solid #e7e5e4;padding-bottom:4px;">시장</h2>
+<table style="border-collapse:collapse;font-size:14px;">
+{% for name, q in context.market.indices.items() %}
+<tr><td style="padding:2px 12px 2px 0;">{{ name }}</td><td style="padding:2px 12px 2px 0;text-align:right;">{{ q.close|num(2) }}</td><td>{{ q.change_pct|signed_pct }}</td></tr>
+{% endfor %}
+{% if context.market.fx_usdkrw %}<tr><td style="padding:2px 12px 2px 0;">원/달러</td><td style="padding:2px 12px 2px 0;text-align:right;">{{ context.market.fx_usdkrw|num(2) }}</td><td></td></tr>{% endif %}
+</table>
+{% if analysis and analysis.market_comment %}<p>{{ analysis.market_comment }}</p>{% endif %}
+{% endif %}
+
+<h2 style="font-size:16px;border-bottom:1px solid #e7e5e4;padding-bottom:4px;">보유 종목</h2>
+{% for h in context.holdings %}
+{% set a = analyses.get(h.ticker) %}
+{% set sig = a.signal if a else h.signal %}
+<div style="border:1px solid #e7e5e4;border-radius:6px;padding:12px 14px;margin:0 0 12px;">
+  <div style="font-size:15px;"><strong>{{ h.name }}</strong> <span style="color:#78716c;font-size:13px;">{{ h.ticker }}</span>
+  {% if sig %}<span style="display:inline-block;margin-left:6px;padding:1px 8px;border-radius:10px;color:#fff;font-size:12px;background:{{ signal_colors[sig] }};">{{ signal_labels[sig] }}</span>{% endif %}</div>
+
+  {% if a %}
+  <p style="margin:8px 0 4px;"><strong>{{ a.headline }}</strong></p>
+  <p style="margin:0 0 8px;">{{ a.reasoning }}</p>
+  {% if a.signal_downgraded_reason %}<p style="margin:0 0 8px;font-size:13px;">※ 계산상 추가매수였지만 보유로 낮춘 이유: {{ a.signal_downgraded_reason }}</p>{% endif %}
+  {% endif %}
+  {% if h.signal_reasons %}<p style="margin:4px 0;font-size:13px;color:#57534e;">판단 근거: {{ h.signal_reasons|join(", ") }}</p>{% endif %}
+
+  {% if h.price %}
+  <p style="margin:6px 0;font-size:14px;">현재가 {{ h.price.close|money(h.market) }} ({{ h.price.price_date }}) · 보유 {{ h.position.qty|num(0) }}주 · 평균 {{ h.position.avg_price|money(h.market) }}{% if h.position.weight_pct is not none %} · 비중 {{ h.position.weight_pct|num(1) }}%{% endif %}</p>
+  {% endif %}
+
+  {% if h.valuation and not h.valuation.insufficient %}
+  <table style="border-collapse:collapse;font-size:13px;margin:6px 0;">
+    <tr><td style="padding:2px 12px 2px 0;">적정가</td><td style="text-align:right;">{{ h.valuation.fair|money(h.market) }}</td></tr>
+    <tr><td style="padding:2px 12px 2px 0;">분할매수 1·2·3단계</td><td style="text-align:right;">{{ h.valuation.buy[0]|money(h.market) }} / {{ h.valuation.buy[1]|money(h.market) }} / {{ h.valuation.buy[2]|money(h.market) }}</td></tr>
+    <tr><td style="padding:2px 12px 2px 0;">일부매도 1·2차</td><td style="text-align:right;">{{ h.valuation.sell[0]|money(h.market) }} / {{ h.valuation.sell[1]|money(h.market) }}</td></tr>
+    <tr><td style="padding:2px 12px 2px 0;">재검토 기준가</td><td style="text-align:right;">{{ h.valuation.review|money(h.market) }}</td></tr>
+  </table>
+  <p style="margin:0 0 6px;font-size:12px;color:#78716c;">{{ h.valuation.method }} 밴드 기준 · 현재 {{ h.valuation.current_multiple|num(2) }}배 · 과거 5년 분포 {{ h.valuation.band.p10|num(1) }}~{{ h.valuation.band.p90|num(1) }}배 (중앙값 {{ h.valuation.band.p50|num(1) }}배) · 최근 4분기 실적 기준이라 실적이 급변한 회사는 왜곡될 수 있어요</p>
+  {% elif h.valuation %}
+  <p style="margin:6px 0;font-size:13px;">{{ h.valuation.note }}{% if h.valuation.review %} · 재검토 기준가 {{ h.valuation.review|money(h.market) }}{% endif %}</p>
+  {% endif %}
+
+  {% if h.fundamentals %}
+  <table style="border-collapse:collapse;font-size:13px;margin:6px 0;width:100%;">
+  {% for label, key, unit in fundamental_rows %}
+    <tr><td style="padding:3px 8px 3px 0;white-space:nowrap;vertical-align:top;">{{ label }}</td>
+        <td style="padding:3px 8px 3px 0;text-align:right;white-space:nowrap;vertical-align:top;">{% if h.fundamentals[key] is not none %}{{ h.fundamentals[key]|num(1) }}{{ unit }}{% else %}-{% endif %}</td>
+        <td style="padding:3px 0;color:#78716c;font-size:12px;">{{ glossary[label] }}</td></tr>
+  {% endfor %}
+  </table>
+  <p style="margin:0;font-size:12px;color:#78716c;">재무 기준: {{ h.fundamentals.latest_quarter }}</p>
+  {% endif %}
+
+  {% if a and a.indicator_notes %}
+  <ul style="font-size:13px;">{% for n in a.indicator_notes %}<li><strong>{{ n.term }} {{ n.value }}</strong> — {{ n.plain }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if h.price and h.price.ma20 is not none %}
+  <p style="margin:6px 0;font-size:13px;">흐름(보조): 20일선 {{ h.price.ma20|money(h.market) }} · 60일선 {{ h.price.ma60|money(h.market) }} · 120일선 {{ h.price.ma120|money(h.market) }} · RSI {{ h.price.rsi14|num(1) }} · 52주 위치 {{ h.price.pos_52w_pct|num(0) }}</p>
+  {% endif %}
+
+  {% if h.flows %}
+  <p style="margin:6px 0;font-size:13px;">최근 5일 순매수: 외국인 {{ h.flows.foreign_5d_krw|money }} · 기관 {{ h.flows.institution_5d_krw|money }}</p>
+  {% endif %}
+
+  {% if h.disclosures %}
+  <ul style="font-size:13px;margin:6px 0;">{% for d in h.disclosures %}<li>{{ d.date }} <a href="{{ d.url }}">{{ d.title }}</a>{% if d.negative %} <strong style="color:#b91c1c;">주의</strong>{% endif %}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if a and a.disclosure_notes %}<p style="margin:4px 0;font-size:13px;">{{ a.disclosure_notes }}</p>{% endif %}
+
+  {% if h.missing %}<p style="margin:6px 0 0;color:#b45309;font-size:12px;">데이터 누락: {{ h.missing|join(" / ") }}</p>{% endif %}
+</div>
+{% endfor %}
+
+<h2 style="font-size:16px;border-bottom:1px solid #e7e5e4;padding-bottom:4px;">포트폴리오 점검</h2>
+<p style="font-size:14px;margin:4px 0;">총 평가액 {{ context.portfolio.total_krw|money }}{% if context.portfolio.cash_krw %} (현금 {{ context.portfolio.cash_krw|money }} 포함){% endif %}</p>
+<table style="border-collapse:collapse;font-size:13px;">
+<tr><th style="text-align:left;padding:2px 12px 2px 0;">자산군</th><th style="text-align:right;padding:2px 12px 2px 0;">현재</th><th style="text-align:right;padding:2px 12px 2px 0;">목표</th><th style="text-align:right;">차이</th></tr>
+{% for cls, w in context.portfolio.by_class.items() %}
+<tr><td style="padding:2px 12px 2px 0;">{{ w.label }}</td><td style="text-align:right;padding:2px 12px 2px 0;">{{ w.pct|num(1) }}%</td><td style="text-align:right;padding:2px 12px 2px 0;">{{ w.target_pct|num(0) }}%</td><td style="text-align:right;">{{ w.diff_pct|num(1) }}%p</td></tr>
+{% endfor %}
+</table>
+{% if context.portfolio.rebalance %}<ul style="font-size:14px;">{% for r in context.portfolio.rebalance %}<li>{{ r.label }} {{ r.amount_krw|money }} {{ r.action }}</li>{% endfor %}</ul>{% endif %}
+{% if context.portfolio.warnings %}<ul style="font-size:13px;color:#b45309;">{% for w in context.portfolio.warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+{% if analysis and analysis.portfolio_comment %}<p>{{ analysis.portfolio_comment }}</p>{% endif %}
+
+<h2 style="font-size:16px;border-bottom:1px solid #e7e5e4;padding-bottom:4px;">용어 풀이</h2>
+<dl style="font-size:13px;">
+{% for term in context.glossary_terms %}<dt style="font-weight:bold;margin-top:6px;">{{ term }}</dt><dd style="margin:0 0 0 12px;">{{ glossary[term] }}</dd>{% endfor %}
+</dl>
+
+<hr style="border:none;border-top:1px solid #e7e5e4;margin:20px 0 8px;">
+{% if notes or context.market.missing %}<p style="font-size:12px;color:#78716c;">실행 메모: {{ (notes + context.market.missing)|join(" / ") }}</p>{% endif %}
+<p style="font-size:12px;color:#78716c;">{{ disclaimer }}</p>
+</div>
+</body>
+</html>
