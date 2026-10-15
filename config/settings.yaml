@@ -1,0 +1,14 @@
+profile:
+  name: balanced
+  review_drawdown_pct: 15
+  max_single_weight_pct: 15
+  rebalance_band_pct: 5
+  buy_tranches: 3
+target_allocation:
+  domestic: 30
+  us: 40
+  index: 30
+band_years: 5
+min_band_points: 36
+disclosure_days: 7
+report_subject_prefix: "[투자 리포트]"
