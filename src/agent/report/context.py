@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 
+from agent.analysis.assessment import assess
 from agent.analysis.disclosures import classify
 from agent.analysis.financials import build_quarters
 from agent.analysis.fundamentals import compute_fundamentals
@@ -74,6 +75,7 @@ def _analyze_kr(h: HoldingContext, closes: pd.Series, market, dart, settings: Se
     current = h.fundamentals.per if method == "PER" else h.fundamentals.pbr
     h.valuation = band_valuation(multiples, method, current, close, h.position.avg_price, settings.profile,
                                  settings.band_years, settings.min_band_points)
+    h.assessments = assess(h.fundamentals, h.valuation, h.financial_sector)
 
     for row in dart.disclosures(corp, today - timedelta(days=settings.disclosure_days), today):
         category, negative = classify(row["report_nm"])

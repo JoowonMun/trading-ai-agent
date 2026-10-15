@@ -42,6 +42,7 @@ def test_happy_path():
     assert samsung.valuation.method == "PER" and not samsung.valuation.insufficient
     assert samsung.signal in {"add", "hold", "trim", "review"}
     assert samsung.position.weight_pct > 0
+    assert samsung.assessments["roe"] in {"good", "neutral", "caution"}
     assert h["000660"].signal == "review"
     assert h["000660"].disclosures[0].negative
     assert h["AAPL"].signal is None and any("2단계" in m for m in h["AAPL"].missing)

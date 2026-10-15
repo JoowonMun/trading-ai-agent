@@ -80,6 +80,7 @@ class HoldingContext(BaseModel):
     fundamentals: Fundamentals | None = None
     valuation: Valuation | None = None
     financial_sector: bool = False
+    assessments: dict[str, Literal["good", "neutral", "caution"] | None] = {}
     signal: Signal | None = None
     signal_reasons: list[str] = []
     nps: dict | None = None
