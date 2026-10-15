@@ -6,6 +6,7 @@ dependencies = [
     "httpx>=0.27",
     "pandas>=2.2",
     "pykrx",
+    "setuptools<81",  # pykrx가 pkg_resources를 import (setuptools 81에서 제거 예정)
     "yfinance",
     "pydantic>=2.7",
     "jinja2>=3.1",
