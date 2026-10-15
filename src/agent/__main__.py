@@ -1,0 +1,98 @@
+"""CLI: python -m agent {collect,publish,run}."""
+import argparse
+import json
+import logging
+import os
+import sys
+from datetime import date
+from html import escape
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+from agent.collectors.dart import DartClient
+from agent.collectors.prices import MarketData
+from agent.config import load_holdings, load_settings, today_kst
+from agent.delivery.email import send_email
+from agent.report.context import ContextError, build_context
+from agent.report.render import render_report
+from agent.report.schema import Context
+from agent.report.validate import validate_analysis
+
+log = logging.getLogger("agent")
+
+
+def _day_dir(args) -> Path:
+    return args.out / args.date.isoformat()
+
+
+def cmd_collect(args) -> Path:
+    settings = load_settings(args.config_dir / "settings.yaml")
+    holdings = load_holdings(args.config_dir / "holdings.yaml")
+    dart = DartClient(os.environ["DART_API_KEY"], cache_dir=Path(".cache/dart"), today=args.date)
+    context = build_context(settings, holdings, MarketData(), dart, args.date)
+    day = _day_dir(args)
+    day.mkdir(parents=True, exist_ok=True)
+    path = day / "context.json"
+    path.write_text(context.model_dump_json(indent=2), encoding="utf-8")
+    log.info("context 저장: %s", path)
+    return path
+
+
+def cmd_publish(args) -> Path:
+    settings = load_settings(args.config_dir / "settings.yaml")
+    day = _day_dir(args)
+    context = Context.model_validate_json((day / "context.json").read_text(encoding="utf-8"))
+
+    notes, analysis = [], None
+    analysis_path = day / "analysis.json"
+    if analysis_path.exists():
+        analysis, errors = validate_analysis(json.loads(analysis_path.read_text(encoding="utf-8")), context)
+        if errors:
+            notes.append("AI 분석 검증 실패 → 숫자 리포트로 대체")
+            notes.extend(errors[:5])
+    else:
+        notes.append("AI 분석 없음 → 숫자 리포트")
+
+    html = render_report(context, analysis, notes)
+    preview = day / "preview.html"
+    preview.write_text(html, encoding="utf-8")
+    log.info("미리보기 저장: %s", preview)
+    if not args.dry_run:
+        send_email(f"{settings.report_subject_prefix} {context.date}", html)
+        log.info("메일 발송 완료")
+    return preview
+
+
+def cmd_run(args) -> None:
+    try:
+        cmd_collect(args)
+    except ContextError as e:
+        if not args.dry_run:
+            settings = load_settings(args.config_dir / "settings.yaml")
+            send_email(f"{settings.report_subject_prefix} {args.date} 생성 실패",
+                       f"<p>오늘 리포트를 만들지 못했습니다: {escape(str(e))}</p>")
+        raise
+    cmd_publish(args)
+
+
+def main(argv: list[str] | None = None) -> None:
+    load_dotenv()
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+    parser = argparse.ArgumentParser(prog="python -m agent")
+    parser.add_argument("command", choices=["collect", "publish", "run"])
+    parser.add_argument("--date", type=date.fromisoformat, default=None, help="기준일 (기본: 오늘, 한국시간)")
+    parser.add_argument("--out", type=Path, default=Path("out"))
+    parser.add_argument("--config-dir", type=Path, default=Path("config"))
+    parser.add_argument("--dry-run", action="store_true", help="메일을 보내지 않고 preview.html만 생성")
+    args = parser.parse_args(argv)
+    args.date = args.date or today_kst()
+
+    {"collect": cmd_collect, "publish": cmd_publish, "run": cmd_run}[args.command](args)
+
+
+if __name__ == "__main__":
+    main()
