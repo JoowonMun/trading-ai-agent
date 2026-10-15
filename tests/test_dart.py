@@ -112,3 +112,31 @@ def test_disclosures(tmp_path):
 
     rows = client(tmp_path, handler).disclosures("C", date(2026, 10, 8), TODAY)
     assert rows[0]["report_nm"] == "유상증자결정"
+
+
+def test_shares_outstanding_accepts_voting_common_stock_label(tmp_path):
+    def handler(request):
+        return httpx.Response(200, json={"status": "000", "list": [
+            {"se": "의결권 있는\n보통주", "istc_totqy": "474,654,361"},
+            {"se": "의결권 없는\n우선주", "istc_totqy": "-"},
+            {"se": "합계", "istc_totqy": "474,654,361"},
+        ]})
+
+    assert client(tmp_path, handler).shares_outstanding("C") == 474_654_361
+
+
+def test_cache_write_failure_does_not_lose_data(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    def handler(request):
+        return httpx.Response(200, json={"status": "000", "list": [{"a": 1}]})
+
+    real_write = Path.write_text
+
+    def locked(self, *a, **k):
+        if self.name.startswith("fin_"):
+            raise PermissionError(13, "Permission denied")
+        return real_write(self, *a, **k)
+
+    monkeypatch.setattr(Path, "write_text", locked)
+    assert client(tmp_path, handler).financial_rows("C", 2025, 4) == [{"a": 1}]

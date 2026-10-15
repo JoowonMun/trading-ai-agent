@@ -1,6 +1,7 @@
 """OpenDART API 클라이언트 (https://opendart.fss.or.kr)."""
 import io
 import json
+import logging
 import time
 import xml.etree.ElementTree as ET
 import zipfile
@@ -10,6 +11,8 @@ from pathlib import Path
 import httpx
 
 from agent.analysis.financials import REPORT_CODES, parse_amount, quarter_end
+
+log = logging.getLogger(__name__)
 
 BASE_URL = "https://opendart.fss.or.kr/api"
 CORP_CODE_MAX_AGE_SEC = 7 * 24 * 3600
@@ -21,6 +24,14 @@ class DartError(RuntimeError):
 
 class NotInDart(DartError):
     """DART 고유번호 목록에 없는 종목 (ETF·ETN·펀드 등)."""
+
+
+def _write_cache(path: Path, text: str) -> None:
+    """캐시는 속도용 보조 수단 — Windows 백신 등이 파일을 잠가 저장에 실패해도 분석은 계속한다."""
+    try:
+        path.write_text(text, encoding="utf-8")
+    except OSError as e:
+        log.warning("DART 캐시 저장 실패 %s: %s", path.name, e)
 
 
 def disclosure_url(rcept_no: str) -> str:
@@ -61,7 +72,7 @@ class DartClient:
             stock_code = (el.findtext("stock_code") or "").strip()
             if stock_code:
                 codes[stock_code] = el.findtext("corp_code").strip()
-        cache.write_text(json.dumps(codes), encoding="utf-8")
+        _write_cache(cache, json.dumps(codes))
         return codes
 
     def corp_code(self, stock_code: str) -> str:
@@ -87,7 +98,7 @@ class DartClient:
                 rows = data["list"]
                 break
         if rows is not None and year < self.today.year:
-            cache.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+            _write_cache(cache, json.dumps(rows, ensure_ascii=False))
         return rows
 
     def _past_periods(self, start_year: int) -> list[tuple[int, int]]:
@@ -107,7 +118,8 @@ class DartClient:
             data = self._get_json("stockTotqySttus.json", corp_code=corp_code, bsns_year=str(year),
                                   reprt_code=REPORT_CODES[quarter])
             for row in (data or {}).get("list", []):
-                if row.get("se", "").replace(" ", "") == "보통주":
+                label = "".join(row.get("se", "").split())  # "의결권 있는\n보통주" → "의결권있는보통주"
+                if label.endswith("보통주") and "없는" not in label:
                     value = parse_amount(row.get("istc_totqy"))
                     if value:
                         return value
