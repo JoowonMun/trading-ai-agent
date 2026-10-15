@@ -26,3 +26,71 @@ def report_rows(rev_cum, op_cum, ni_cum, equity_owners=None, equity_total=None, 
         if value is not None:
             rows.append({"sj_div": "BS", "account_id": account_id, "account_nm": name, "thstrm_amount": f"{value:,.0f}"})
     return rows
+
+
+from datetime import date
+
+import numpy as np
+import pandas as pd
+
+from agent.analysis.financials import quarter_end
+
+
+class FakeMarket:
+    def __init__(self, fail=()):
+        self.fail = set(fail)
+
+    def _series(self, ticker, end, low, high):
+        if ticker in self.fail:
+            raise RuntimeError(f"{ticker} 시세 실패")
+        index = pd.bdate_range(end=pd.Timestamp(end), periods=1500)
+        return pd.Series(np.linspace(low, high, len(index)), index=index)
+
+    def kr_closes(self, ticker, start, end):
+        return self._series(ticker, end, 40_000, 60_000)
+
+    def us_closes(self, ticker, start, end):
+        return self._series(ticker, end, 100, 200)
+
+    def usdkrw(self, today):
+        return 1300.0
+
+    def indices(self, today):
+        return {"KOSPI": {"close": 2500.0, "change_pct": 0.5}}
+
+    def kr_flows(self, ticker, end):
+        return None
+
+
+class FakeDart:
+    def __init__(self, today, fail=(), negative=()):
+        self.today, self.fail, self.negative = today, set(fail), set(negative)
+
+    def corp_code(self, ticker):
+        if ticker in self.fail:
+            from agent.collectors.dart import DartError
+            raise DartError(f"{ticker} 없음")
+        return f"C{ticker}"
+
+    def company(self, corp_code):
+        return {"induty_code": "264"}
+
+    def quarterly_reports(self, corp_code, years):
+        out = {}
+        for y in range(self.today.year - years, self.today.year + 1):
+            for q in range(1, 5):
+                if quarter_end(y, q) <= self.today:
+                    out[(y, q)] = report_rows(q * 100e9, q * 10e9, q * 8e9, equity_owners=200e9,
+                                              equity_total=250e9, liabilities=100e9, with_add=q < 4)
+        return out
+
+    def shares_outstanding(self, corp_code):
+        return 1_000_000
+
+    def dividend_per_share(self, corp_code):
+        return 1000.0
+
+    def disclosures(self, corp_code, start, end):
+        if corp_code[1:] in self.negative:
+            return [{"report_nm": "유상증자결정", "rcept_no": "20261014000001", "rcept_dt": "20261014"}]
+        return []
