@@ -94,3 +94,43 @@ class FakeDart:
         if corp_code[1:] in self.negative:
             return [{"report_nm": "유상증자결정", "rcept_no": "20261014000001", "rcept_dt": "20261014"}]
         return []
+
+
+def sample_context():
+    from agent.config import Profile
+    from agent.report.schema import (Band, ClassWeight, Context, Fundamentals, HoldingContext, IndexQuote, Market,
+                                     Portfolio, PositionInfo, PriceSnapshot, Rebalance, Valuation)
+
+    return Context(
+        date="2026-10-15",
+        profile=Profile(),
+        market=Market(indices={"KOSPI": IndexQuote(close=2500.0, change_pct=0.52)}, fx_usdkrw=1350.0),
+        holdings=[
+            HoldingContext(
+                ticker="005930", name="삼성전자", market="KR", asset_class="domestic",
+                position=PositionInfo(qty=10, avg_price=71000, weight_pct=8.2),
+                price=PriceSnapshot(close=65000, price_date="2026-10-14", ma20=66000, ma60=68000, ma120=70000,
+                                    rsi14=38.5, pos_52w_pct=22.0),
+                fundamentals=Fundamentals(per=12.3, pbr=1.1, roe=9.5, op_margin=12.0, rev_yoy=5.0, op_yoy=10.0,
+                                          debt_ratio=35.0, div_yield=2.2, ttm_net_income=3.2e13,
+                                          latest_quarter="2026Q2"),
+                valuation=Valuation(method="PER", insufficient=False, current_multiple=12.3,
+                                    band=Band(p10=8.0, p25=10.0, p50=13.0, p75=16.0, p90=19.0),
+                                    fair=68699, buy=[52846, 47561, 42276], sell=[84553, 100406], review=60350),
+                signal="hold",
+            ),
+            HoldingContext(
+                ticker="AAPL", name="Apple", market="US", asset_class="us",
+                position=PositionInfo(qty=5, avg_price=185.2, weight_pct=12.0),
+                price=PriceSnapshot(close=230.5, price_date="2026-10-14"),
+                missing=["미국 종목 분석은 2단계에서 추가됩니다"],
+            ),
+        ],
+        portfolio=Portfolio(
+            total_krw=8_000_000, cash_krw=0,
+            by_class={"domestic": ClassWeight(label="국내", value_krw=650_000, pct=8.2, target_pct=30, diff_pct=-21.8)},
+            rebalance=[Rebalance(asset_class="domestic", label="국내", action="늘리기", amount_krw=1_740_000)],
+            weights={"KR:005930": 8.2, "US:AAPL": 12.0},
+        ),
+        glossary_terms=["PER", "ROE"],
+    )
