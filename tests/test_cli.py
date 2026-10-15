@@ -51,6 +51,22 @@ def test_run_sends_failure_email_on_any_error(tmp_path, monkeypatch):
     assert "따옴표" in sent[0][1] and "&lt;ticker&gt;" in sent[0][1]
 
 
+def test_http_client_logs_do_not_expose_api_keys(tmp_path):
+    import logging
+
+    config, _ = setup_dirs(tmp_path)
+    root, httpx_logger = logging.getLogger(), logging.getLogger("httpx")
+    old_root, old_httpx = root.level, httpx_logger.level
+    try:
+        root.setLevel(logging.INFO)          # 실제 실행처럼 INFO 로그가 켜진 상태
+        httpx_logger.setLevel(logging.NOTSET)
+        cli.main(args(tmp_path, config, "--dry-run"))
+        assert httpx_logger.getEffectiveLevel() >= logging.WARNING
+    finally:
+        root.setLevel(old_root)
+        httpx_logger.setLevel(old_httpx)
+
+
 def test_publish_sends_email(tmp_path, monkeypatch):
     config, day = setup_dirs(tmp_path)
     sent = []

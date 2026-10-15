@@ -88,6 +88,8 @@ def main(argv: list[str] | None = None) -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    # httpx는 INFO에서 요청 URL 전체를 찍는데, DART는 API 키가 URL 쿼리에 들어간다
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     parser = argparse.ArgumentParser(prog="python -m agent")
     parser.add_argument("command", choices=["collect", "publish", "run"])
