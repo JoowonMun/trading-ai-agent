@@ -185,7 +185,7 @@ trading-ai-agent/
 │  │   ├─ glossary.py        # 지표 용어 풀이 사전
 │  │   └─ templates/         # 메일 HTML, 노션 블록 (Jinja2)
 │  ├─ delivery/
-│  │   ├─ email.py           # Gmail SMTP
+│  │   ├─ email.py           # SMTP 발송 (기본 네이버 메일)
 │  │   └─ notion.py          # Notion API
 │  └─ llm/
 │      └─ api_analyzer.py    # API 모드 분석 (예비)
@@ -354,7 +354,7 @@ cash_krw: 0
 - 로컬: `.env` (git 제외), `.env.example`에 키 이름만
 - Routine: 클라우드 환경 환경변수
 - GitHub Actions(예비): Repository Secrets
-- 키 목록: `DART_API_KEY`, `DATA_GO_KR_KEY`, `SEC_USER_AGENT`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `REPORT_TO`, `NOTION_TOKEN`, `NOTION_DATABASE_ID` / 선택: `ECOS_API_KEY`, `FRED_API_KEY`, `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `FINNHUB_API_KEY` / API 모드: `ANTHROPIC_API_KEY`
+- 키 목록: `DART_API_KEY`, `DATA_GO_KR_KEY`, `SEC_USER_AGENT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `MAIL_TO`(선택), `SMTP_HOST`/`SMTP_PORT`(선택, 기본 smtp.naver.com:465), `NOTION_TOKEN`, `NOTION_DATABASE_ID` / 선택: `ECOS_API_KEY`, `FRED_API_KEY`, `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `FINNHUB_API_KEY` / API 모드: `ANTHROPIC_API_KEY`
 - 발급 방법은 `docs/setup-keys.md`에 정리
 
 ## 11. 구현 단계
