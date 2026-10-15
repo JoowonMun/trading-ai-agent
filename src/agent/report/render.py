@@ -4,11 +4,12 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from agent.report.glossary import GLOSSARY
-from agent.report.schema import Analysis, Context
+from agent.report.glossary import GLOSSARY, GLOSSARY_SHORT
+from agent.report.schema import Analysis, Context, HoldingContext
 
 SIGNAL_LABELS = {"add": "추가매수", "hold": "보유", "trim": "일부매도", "review": "재검토"}
 SIGNAL_COLORS = {"add": "#15803d", "hold": "#57534e", "trim": "#b45309", "review": "#b91c1c"}
+GRADES = {"good": ("좋음", "#15803d"), "neutral": ("보통", "#78716c"), "caution": ("주의", "#b91c1c")}
 FUNDAMENTAL_ROWS = [
     ("PER", "per", "배"), ("PBR", "pbr", "배"), ("ROE", "roe", "%"), ("영업이익률", "op_margin", "%"),
     ("매출 성장률", "rev_yoy", "%"), ("영업이익 성장률", "op_yoy", "%"), ("부채비율", "debt_ratio", "%"),
@@ -37,6 +38,17 @@ _env = Environment(loader=FileSystemLoader(Path(__file__).parent / "templates"),
 _env.filters.update(num=_num, money=_money, signed_pct=_signed_pct)
 
 
+def price_ladder(h: HoldingContext) -> list[tuple[str, float, bool]]:
+    """기준 가격들을 높은 순으로 세우고 그 사이에 현재가를 끼워 넣는다: (이름, 가격, 현재가 여부)."""
+    v = h.valuation
+    rows = [("일부매도 2차", v.sell[1], False), ("일부매도 1차", v.sell[0], False), ("적정가", v.fair, False),
+            ("분할매수 1단계", v.buy[0], False), ("분할매수 2단계", v.buy[1], False),
+            ("분할매수 3단계", v.buy[2], False), ("현재가", h.price.close, True)]
+    if v.review is not None:
+        rows.append(("재검토 기준가", v.review, False))
+    return sorted(rows, key=lambda row: -row[1])
+
+
 def auto_summary(context: Context) -> list[str]:
     counts = Counter(h.signal for h in context.holdings if h.signal)
     lines = [f"추가매수 후보 {counts['add']}개 · 일부매도 {counts['trim']}개 · "
@@ -61,6 +73,9 @@ def render_report(context: Context, analysis: Analysis | None, notes: list[str])
         summary=analysis.summary if analysis else auto_summary(context),
         notes=notes,
         glossary=GLOSSARY,
+        glossary_short=GLOSSARY_SHORT,
+        grades=GRADES,
+        price_ladder=price_ladder,
         signal_labels=SIGNAL_LABELS,
         signal_colors=SIGNAL_COLORS,
         fundamental_rows=FUNDAMENTAL_ROWS,

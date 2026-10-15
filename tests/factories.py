@@ -123,6 +123,7 @@ def sample_context():
                 valuation=Valuation(method="PER", insufficient=False, current_multiple=12.3,
                                     band=Band(p10=8.0, p25=10.0, p50=13.0, p75=16.0, p90=19.0),
                                     fair=68699, buy=[52846, 47561, 42276], sell=[84553, 100406], review=60350),
+                assessments={"per": "good", "roe": "neutral", "debt_ratio": "good", "op_yoy": "caution"},
                 signal="hold",
             ),
             HoldingContext(

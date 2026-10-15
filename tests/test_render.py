@@ -37,6 +37,29 @@ def test_report_with_analysis_uses_ai_text():
     assert "적정가 근처라 보유" in html
 
 
+def test_summary_table_comes_first():
+    html = render_report(sample_context(), None, [])
+    assert "한눈에 보기" in html
+    assert html.index("한눈에 보기") < html.index("52,846원") < html.index("보유 종목 상세")
+
+
+def test_price_ladder_places_current_price():
+    from agent.report.render import price_ladder
+    ladder = price_ladder(sample_context().holdings[0])
+    assert [label for label, _, _ in ladder] == [
+        "일부매도 2차", "일부매도 1차", "적정가", "현재가", "재검토 기준가",
+        "분할매수 1단계", "분할매수 2단계", "분할매수 3단계"]
+    assert [is_now for _, _, is_now in ladder].count(True) == 1
+
+
+def test_indicator_table_shows_grades_and_short_text():
+    from agent.report.glossary import GLOSSARY_SHORT
+    html = render_report(sample_context(), None, [])
+    assert "좋음" in html and "보통" in html and "주의" in html
+    assert GLOSSARY_SHORT["ROE"] in html
+    assert html.count(GLOSSARY["PER"]) == 1   # 긴 설명은 맨 아래 용어 풀이에만
+
+
 def test_html_is_escaped():
     analysis = Analysis(date="2026-10-15", summary=["<script>x</script>"], holdings=[])
     assert "<script>x" not in render_report(sample_context(), analysis, [])
