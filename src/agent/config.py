@@ -74,6 +74,10 @@ def load_settings(path: Path) -> Settings:
 
 
 def load_holdings(path: Path) -> Holdings:
+    if not Path(path).exists():
+        raise FileNotFoundError(
+            f"{path}가 없습니다. config/holdings.example.yaml을 복사해 {Path(path).name}로 저장하고 "
+            "실제 보유 종목을 적어주세요 (이 파일은 git에 올라가지 않습니다).")
     return Holdings.model_validate(_read_yaml(path))
 
 

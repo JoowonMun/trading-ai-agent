@@ -60,4 +60,15 @@ def test_today_kst_from_utc_evening():
 def test_repo_config_files_load():
     from pathlib import Path
     load_settings(Path("config/settings.yaml"))
-    load_holdings(Path("config/holdings.yaml"))
+    load_holdings(Path("config/holdings.example.yaml"))
+
+
+def test_missing_holdings_file_explains_how_to_create(tmp_path):
+    with pytest.raises(FileNotFoundError, match="holdings.example.yaml"):
+        load_holdings(tmp_path / "holdings.yaml")
+
+
+def test_personal_holdings_file_is_git_ignored():
+    import subprocess
+    result = subprocess.run(["git", "check-ignore", "-q", "config/holdings.yaml"])
+    assert result.returncode == 0
