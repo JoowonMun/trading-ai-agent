@@ -45,12 +45,16 @@ def test_same_ticker_in_two_accounts_is_merged():
     assert merged["KR:A"].analyze is True
 
 
-def test_missing_price_is_excluded_with_warning():
+def test_missing_price_is_excluded_and_rebalance_withheld():
     p = run({"KR:A": 6000, "KR:C": 20000})
     assert p.total_krw == 800_000
     assert any("비: 시세 없음" in w for w in p.warnings)
+    assert p.rebalance == []
+    assert any("리밸런싱 보류" in w for w in p.warnings)
 
 
-def test_missing_fx_excludes_us():
+def test_missing_fx_excludes_us_with_fx_reason():
     p = run({"KR:A": 6000, "US:B": 200, "KR:C": 20000}, fx=None)
     assert "US:B" not in p.weights
+    assert any("비: 환율 없음" in w for w in p.warnings)
+    assert p.rebalance == []

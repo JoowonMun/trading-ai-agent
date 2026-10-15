@@ -59,7 +59,9 @@ def value_positions(positions: list[AggregatedPosition], closes: dict[str, float
 
 
 def summarize(values: list[PositionValue], cash_krw: float, settings: Settings) -> Portfolio:
-    warnings = [f"{v.position.name}: 시세 없음 — 비중 계산에서 제외" for v in values if v.value_krw is None]
+    warnings = [f"{v.position.name}: {'시세' if v.close is None else '환율'} 없음 — 비중 계산에서 제외"
+                for v in values if v.value_krw is None]
+    incomplete = bool(warnings)
     priced = [v for v in values if v.value_krw is not None]
     total = sum(v.value_krw for v in priced) + cash_krw
     if total <= 0:
@@ -74,10 +76,13 @@ def summarize(values: list[PositionValue], cash_krw: float, settings: Settings) 
         diff = pct - target
         by_class[cls] = ClassWeight(label=CLASS_LABELS[cls], value_krw=value, pct=pct,
                                     target_pct=target, diff_pct=diff)
-        if abs(diff) > band:
+        if abs(diff) > band and not incomplete:
             rebalance.append(Rebalance(asset_class=cls, label=CLASS_LABELS[cls],
                                        action="줄이기" if diff > 0 else "늘리기",
                                        amount_krw=round(abs(diff) / 100 * total, -4)))
+
+    if incomplete:
+        warnings.append("평가 불완전 — 빠진 종목 때문에 비중이 틀릴 수 있어 리밸런싱 보류")
 
     limit = settings.profile.max_single_weight_pct
     for v in priced:
