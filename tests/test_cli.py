@@ -140,3 +140,24 @@ def test_nh_failure_with_no_manual_holdings_raises_clear_error(monkeypatch):
 
     with pytest.raises(RuntimeError, match="보유 종목이 없습니다"):
         cli.resolve_holdings(Settings(), Holdings(accounts=[]), [], nh_factory=lambda: BrokenNh())
+
+
+def test_check_command_reports_validation_result(tmp_path, capsys):
+    import pytest
+    config, day = setup_dirs(tmp_path)
+    base = ["check", "--date", "2026-10-15", "--out", str(tmp_path / "out"), "--config-dir", str(config)]
+    (day / "analysis.json").write_text(json.dumps({
+        "date": "2026-10-15", "summary": ["보유 유지"],
+        "holdings": [{"ticker": "005930", "signal": "hold", "headline": "현재가 65,000원", "reasoning": "PER 12.3배"}],
+    }), encoding="utf-8")
+    cli.main(base)
+    assert "검증 통과" in capsys.readouterr().out
+
+    (day / "analysis.json").write_text(json.dumps({
+        "date": "2026-10-15", "summary": ["x"],
+        "holdings": [{"ticker": "005930", "signal": "hold", "headline": "목표 999,999원", "reasoning": "-"}],
+    }), encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        cli.main(base)
+    assert exc.value.code == 1
+    assert "999,999원" in capsys.readouterr().out

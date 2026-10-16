@@ -98,6 +98,19 @@ def _subject_prefix(args) -> str:
         return "[투자 리포트]"
 
 
+def cmd_check(args) -> None:
+    """AI가 쓴 analysis.json을 검증만 한다 (작성 → check → 수정 반복용)."""
+    day = _day_dir(args)
+    context = Context.model_validate_json((day / "context.json").read_text(encoding="utf-8"))
+    _, errors = validate_analysis(json.loads((day / "analysis.json").read_text(encoding="utf-8")), context)
+    if errors:
+        print("검증 실패:")
+        for e in errors:
+            print(f"- {e}")
+        sys.exit(1)
+    print("검증 통과")
+
+
 def cmd_run(args) -> None:
     """예약 실행용. 어떤 오류든 실패 메일을 보내서 '조용히 안 오는' 날이 없게 한다."""
     try:
@@ -119,7 +132,7 @@ def main(argv: list[str] | None = None) -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     parser = argparse.ArgumentParser(prog="python -m agent")
-    parser.add_argument("command", choices=["collect", "publish", "run"])
+    parser.add_argument("command", choices=["collect", "check", "publish", "run"])
     parser.add_argument("--date", type=date.fromisoformat, default=None, help="기준일 (기본: 오늘, 한국시간)")
     parser.add_argument("--out", type=Path, default=Path("out"))
     parser.add_argument("--config-dir", type=Path, default=Path("config"))
@@ -127,7 +140,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     args.date = args.date or today_kst()
 
-    {"collect": cmd_collect, "publish": cmd_publish, "run": cmd_run}[args.command](args)
+    {"collect": cmd_collect, "check": cmd_check, "publish": cmd_publish, "run": cmd_run}[args.command](args)
 
 
 if __name__ == "__main__":
