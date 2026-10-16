@@ -82,7 +82,8 @@ jobs:
               --output-format json > out/claude.json 2>&1; then
             echo "AI 해설 작성 완료"
           else
-            echo "AI 해설 실패 — 숫자 리포트로 발송"; exit 1
+            echo "AI 해설 실패 — 숫자 리포트로 발송"
+            head -c 600 out/claude.json | sed -E 's/[0-9]{6,}/<num>/g'; echo; exit 1
           fi
 
       - name: 검증 후 메일 발송
