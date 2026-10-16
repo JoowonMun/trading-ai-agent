@@ -11,6 +11,7 @@ from pathlib import Path
 import httpx
 
 from agent.analysis.financials import REPORT_CODES, parse_amount, quarter_end
+from agent.collectors.common import NotACompany
 
 log = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class DartError(RuntimeError):
     pass
 
 
-class NotInDart(DartError):
+class NotInDart(DartError, NotACompany):
     """DART 고유번호 목록에 없는 종목 (ETF·ETN·펀드 등)."""
 
 
