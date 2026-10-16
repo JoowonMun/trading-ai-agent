@@ -5,6 +5,7 @@ import logging
 import time
 import xml.etree.ElementTree as ET
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 
@@ -84,8 +85,19 @@ class DartClient:
         except KeyError:
             raise NotInDart(f"DART에서 종목코드 {stock_code}를 찾을 수 없습니다") from None
 
+    def _cached_json(self, name: str, max_age_sec: float | None, fetch):
+        """name 캐시가 있고 충분히 새것이면 그걸, 아니면 fetch() 결과를 저장해 돌려준다 (None은 저장 안 함)."""
+        cache = self.cache_dir / name
+        if cache.exists() and (max_age_sec is None or time.time() - cache.stat().st_mtime < max_age_sec):
+            return json.loads(cache.read_text(encoding="utf-8"))
+        value = fetch()
+        if value is not None:
+            _write_cache(cache, json.dumps(value, ensure_ascii=False))
+        return value
+
     def company(self, corp_code: str) -> dict:
-        return self._get_json("company.json", corp_code=corp_code) or {}
+        return self._cached_json(f"company_{corp_code}.json", 30 * 24 * 3600,
+                                 lambda: self._get_json("company.json", corp_code=corp_code)) or {}
 
     def financial_rows(self, corp_code: str, year: int, quarter: int) -> list[dict] | None:
         cache = self.cache_dir / f"fin_{corp_code}_{year}_{quarter}.json"
@@ -98,7 +110,7 @@ class DartClient:
             if data and data.get("list"):
                 rows = data["list"]
                 break
-        if rows is not None and year < self.today.year:
+        if rows is not None:  # 제출된 보고서는 바뀌지 않는다 — 미제출(None)만 매번 다시 확인
             _write_cache(cache, json.dumps(rows, ensure_ascii=False))
         return rows
 
@@ -107,14 +119,17 @@ class DartClient:
                 if quarter_end(y, q) <= self.today]
 
     def quarterly_reports(self, corp_code: str, years: int) -> dict[tuple[int, int], list[dict]]:
-        out = {}
-        for year, quarter in self._past_periods(self.today.year - years):
-            rows = self.financial_rows(corp_code, year, quarter)
-            if rows:
-                out[(year, quarter)] = rows
-        return out
+        periods = self._past_periods(self.today.year - years)
+        # 해외(GitHub Actions)에서는 DART 응답이 건당 수 초라 동시에 요청한다
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            results = pool.map(lambda p: self.financial_rows(corp_code, *p), periods)
+        return {period: rows for period, rows in zip(periods, results) if rows}
 
     def shares_outstanding(self, corp_code: str) -> float | None:
+        return self._cached_json(f"shares_{corp_code}.json", 7 * 24 * 3600,
+                                 lambda: self._fetch_shares(corp_code))
+
+    def _fetch_shares(self, corp_code: str) -> float | None:
         for year, quarter in reversed(self._past_periods(self.today.year - 2)):
             data = self._get_json("stockTotqySttus.json", corp_code=corp_code, bsns_year=str(year),
                                   reprt_code=REPORT_CODES[quarter])

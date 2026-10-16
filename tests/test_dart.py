@@ -48,19 +48,38 @@ def test_financial_rows_fall_back_to_ofs(tmp_path):
     assert client(tmp_path, handler).financial_rows("C", 2025, 4) == [{"account_id": "x"}]
 
 
-def test_financial_rows_cache_only_past_years(tmp_path):
+def test_filed_reports_are_cached_unfiled_are_rechecked(tmp_path):
     calls = []
 
     def handler(request):
-        calls.append(request.url.params["bsns_year"])
+        year = request.url.params["bsns_year"]
+        calls.append(year)
+        if year == "2026" and request.url.params["reprt_code"] == "11014":
+            return httpx.Response(200, json={"status": "013"})   # 아직 제출 전
         return httpx.Response(200, json={"status": "000", "list": [{"a": 1}]})
 
     c = client(tmp_path, handler)
-    c.financial_rows("C", 2025, 4)
-    c.financial_rows("C", 2025, 4)
-    c.financial_rows("C", 2026, 2)
-    c.financial_rows("C", 2026, 2)
-    assert calls == ["2025", "2026", "2026"]
+    for _ in range(2):
+        c.financial_rows("C", 2025, 4)
+        c.financial_rows("C", 2026, 2)   # 올해라도 제출된 보고서는 캐시
+        c.financial_rows("C", 2026, 3)   # 미제출(CFS·OFS 2번 요청)은 매번 다시 확인
+    assert calls == ["2025", "2026", "2026", "2026", "2026", "2026"]
+
+
+def test_company_and_shares_are_cached(tmp_path):
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        if request.url.path.endswith("company.json"):
+            return httpx.Response(200, json={"status": "000", "induty_code": "264"})
+        return httpx.Response(200, json={"status": "000", "list": [{"se": "보통주", "istc_totqy": "100"}]})
+
+    for _ in range(2):
+        c = client(tmp_path, handler)
+        assert c.company("C")["induty_code"] == "264"
+        assert c.shares_outstanding("C") == 100
+    assert len(calls) == 2
 
 
 def test_quarterly_reports_skip_future_quarters(tmp_path):

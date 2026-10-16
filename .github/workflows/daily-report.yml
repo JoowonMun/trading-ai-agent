@@ -15,7 +15,7 @@ permissions:
 jobs:
   report:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       DART_API_KEY: ${{ secrets.DART_API_KEY }}
       NH_APP_KEY: ${{ secrets.NH_APP_KEY }}
@@ -43,7 +43,8 @@ jobs:
         run: |
           echo "REPORT_DATE=$(uv run python -c 'from agent.config import today_kst; print(today_kst())')" >> "$GITHUB_ENV"
 
-      - uses: actions/cache@v4
+      - name: DART 캐시 복원
+        uses: actions/cache/restore@v4
         with:
           path: .cache/dart
           key: dart-${{ github.run_id }}
@@ -53,13 +54,20 @@ jobs:
       - name: 데이터 수집·계산 (실패 시 실패 알림 메일)
         run: |
           mkdir -p out
-          if timeout 600 uv run python -m agent collect --notify-on-error --date "$REPORT_DATE" > out/collect.log 2>&1; then
+          if timeout 1500 uv run python -m agent collect --notify-on-error --date "$REPORT_DATE" > out/collect.log 2>&1; then
             echo "수집 완료"
             grep -E "WARNING|ERROR" out/collect.log | sed -E 's/[0-9]{6,}/<num>/g' | cut -c1-160 || true
           else
-            echo "수집 실패 또는 10분 초과"
+            echo "수집 실패 또는 25분 초과"
             grep -vE "^\s*$" out/collect.log | tail -n 15 | sed -E 's/[0-9]{6,}/<num>/g' | cut -c1-160; exit 1
           fi
+
+      - name: DART 캐시 저장 (수집이 실패해도 받은 보고서는 다음 실행에서 재사용)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/dart
+          key: dart-${{ github.run_id }}
 
       - name: AI 해설 작성 (Claude Code, 구독 인증)
         continue-on-error: true   # 실패해도 숫자 리포트는 발송
