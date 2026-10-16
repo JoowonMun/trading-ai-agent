@@ -76,3 +76,13 @@ def test_band_without_current_multiple_is_insufficient():
     v = band_valuation(multiples, "PER", current_multiple=None, close=300, avg_price=None,
                        profile=Profile(), band_years=5, min_points=36)
     assert v.insufficient and v.review is None
+
+
+def test_band_far_from_price_is_flagged_distorted():
+    multiples = pd.Series(np.arange(1, 61, dtype=float), index=pd.date_range("2021-01-31", periods=60, freq="ME"))
+    common = dict(avg_price=None, profile=Profile(), band_years=5, min_band_points=36)
+    common["min_points"] = common.pop("min_band_points")
+    assert band_valuation(multiples, "PER", current_multiple=10, close=100, **common).distorted   # 적정가 305 (3배)
+    assert band_valuation(multiples, "PER", current_multiple=70, close=100, **common).distorted   # 적정가 44 (절반 미만)
+    ok = band_valuation(multiples, "PER", current_multiple=30, close=300, **common)
+    assert not ok.distorted and ok.note is None

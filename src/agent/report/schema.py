@@ -48,6 +48,7 @@ class Valuation(BaseModel):
     buy: list[float] = []
     sell: list[float] = []
     review: float | None = None
+    distorted: bool = False  # 적정가가 현재가의 2배 초과 또는 절반 미만 → 밴드가 현실과 동떨어졌을 가능성
     note: str | None = None
 
 

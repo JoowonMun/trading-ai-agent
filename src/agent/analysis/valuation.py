@@ -8,6 +8,7 @@ from agent.config import Profile
 from agent.report.schema import Band, Valuation
 
 FINANCIAL_KSIC_PREFIXES = ("64", "65", "66")
+DISTORTION_LOW, DISTORTION_HIGH = 0.5, 2.0  # 적정가 ÷ 현재가가 이 범위를 벗어나면 밴드 왜곡으로 본다
 
 
 def is_financial(induty_code: str | None) -> bool:
@@ -68,7 +69,13 @@ def band_valuation(multiples: pd.Series, method: str, current_multiple: float | 
     def price(multiple):
         return rnd(close * multiple / current_multiple)
 
+    fair_ratio = p50 / current_multiple  # 적정가 ÷ 현재가
+    distorted = not (DISTORTION_LOW <= fair_ratio <= DISTORTION_HIGH)
     return Valuation(
+        distorted=distorted,
+        note=(f"적정가가 현재가의 {fair_ratio:.1f}배라 과거 밴드가 지금과 맞지 않을 수 있어요 "
+              "(이익이 급변한 회사). 가격 기준만으로 사고팔지 않도록 추가매수·일부매도 신호는 내지 않아요")
+        if distorted else None,
         method=method,
         insufficient=False,
         current_multiple=round(current_multiple, 2),

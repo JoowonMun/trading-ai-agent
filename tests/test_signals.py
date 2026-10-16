@@ -49,3 +49,11 @@ def test_insufficient_band_only_weight_and_review_rules():
 def test_reasons_are_reported():
     _, reasons = decide_signal(45, VAL, GOOD, 5, Profile(), True)
     assert reasons == ["재검토 기준가 이하", "최근 악재 유형 공시"]
+
+
+def test_distorted_band_gives_no_price_based_add_or_trim():
+    distorted = VAL.model_copy(update={"distorted": True})
+    assert signal(75, valuation=distorted) == "hold"               # 원래 add
+    assert signal(125, valuation=distorted) == "hold"              # 원래 trim
+    assert signal(100, valuation=distorted, weight=20) == "trim"   # 비중 초과는 유지
+    assert signal(45, valuation=distorted) == "review"             # 재검토도 유지

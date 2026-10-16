@@ -63,3 +63,11 @@ def test_indicator_table_shows_grades_and_short_text():
 def test_html_is_escaped():
     analysis = Analysis(date="2026-10-15", summary=["<script>x</script>"], holdings=[])
     assert "<script>x" not in render_report(sample_context(), analysis, [])
+
+
+def test_distorted_band_warning_is_shown():
+    ctx = sample_context()
+    ctx.holdings[0].valuation.distorted = True
+    ctx.holdings[0].valuation.note = "적정가가 현재가의 3.0배라 과거 밴드가 지금과 맞지 않을 수 있어요"
+    html = render_report(ctx, None, [])
+    assert "밴드 왜곡 가능" in html and "3.0배라" in html

@@ -64,6 +64,9 @@
   {% endif %}
 
   {% if h.valuation and not h.valuation.insufficient and h.price %}
+  {% if h.valuation.distorted %}
+  <p style="margin:8px 0;padding:8px 10px;background:#fef2f2;border-left:3px solid #b91c1c;font-size:13px;">{{ badge("밴드 왜곡 가능", "#b91c1c") }} {{ h.valuation.note }}</p>
+  {% endif %}
   <div style="font-size:13px;font-weight:600;margin:8px 0 4px;">가격 기준표</div>
   <table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px;">
   {% for label, price, is_now in price_ladder(h) %}
