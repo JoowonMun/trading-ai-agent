@@ -39,6 +39,16 @@ def test_monthly_pbr():
     assert pbr.iloc[0] == 10.0  # 100 × 10주 / 자본 100
 
 
+def test_multiples_from_points_uses_latest_available_point():
+    from agent.analysis.valuation import multiples_from_points
+    monthly = pd.Series(100.0, index=pd.date_range("2025-01-31", periods=4, freq="ME"))
+    points = [(pd.Timestamp("2025-02-15"), 50.0), (pd.Timestamp("2024-12-01"), 25.0),
+              (pd.Timestamp("2025-03-20"), -1.0)]  # 적자 시점은 건너뜀
+    m = multiples_from_points(monthly, points, shares=10)
+    assert m.round(1).tolist() == [40.0, 20.0]  # 1월: 25 기준, 2월: 50 기준, 3·4월: 음수라 제외
+    assert list(m.index.strftime("%m")) == ["01", "02"]
+
+
 def test_band_valuation_prices():
     multiples = pd.Series(np.arange(1, 61, dtype=float), index=pd.date_range("2021-01-31", periods=60, freq="ME"))
     v = band_valuation(multiples, "PER", current_multiple=30, close=300, avg_price=10000,

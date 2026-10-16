@@ -20,17 +20,23 @@ def choose_method(financial: bool, ttm_net_income: float | None) -> Literal["PER
     return "PER"
 
 
-def monthly_multiples(monthly_close: pd.Series, quarters: list[QuarterFigures], shares: float,
-                      method: str, lag_days: int = 60) -> pd.Series:
-    denominators = []
+EarningsPoint = tuple[pd.Timestamp, float | None]  # (공시되어 쓸 수 있게 된 날, TTM 순이익 또는 자본)
+
+
+def earnings_points(quarters: list[QuarterFigures], method: str, lag_days: int = 60) -> list[EarningsPoint]:
+    points = []
     for i, q in enumerate(quarters):
         value = ttm(quarters, i)["net_income"] if method == "PER" else q.equity_owners
-        available_from = pd.Timestamp(q.period_end) + pd.Timedelta(days=lag_days)
-        denominators.append((available_from, value))
+        points.append((pd.Timestamp(q.period_end) + pd.Timedelta(days=lag_days), value))
+    return points
 
+
+def multiples_from_points(monthly_close: pd.Series, points: list[EarningsPoint], shares: float) -> pd.Series:
+    """월말마다 그때 이미 공시된 가장 최근 실적으로 PER(또는 PBR)을 계산한다."""
+    ordered = sorted(points, key=lambda p: p[0])
     out = {}
     for month_end, close in monthly_close.items():
-        available = [value for available_from, value in denominators if available_from <= month_end]
+        available = [value for available_from, value in ordered if available_from <= month_end]
         if not available:
             continue
         denom = available[-1]
@@ -38,6 +44,11 @@ def monthly_multiples(monthly_close: pd.Series, quarters: list[QuarterFigures], 
             continue
         out[month_end] = float(close) * shares / denom
     return pd.Series(out, dtype=float)
+
+
+def monthly_multiples(monthly_close: pd.Series, quarters: list[QuarterFigures], shares: float,
+                      method: str, lag_days: int = 60) -> pd.Series:
+    return multiples_from_points(monthly_close, earnings_points(quarters, method, lag_days), shares)
 
 
 def band_valuation(multiples: pd.Series, method: str, current_multiple: float | None, close: float,
