@@ -1,7 +1,7 @@
 from datetime import date
 
 import pytest
-from factories import FakeDart, FakeMarket, FakeUs
+from factories import FakeDart, FakeMarket, FakeNps, FakeUs
 
 from agent.config import Account, Holdings, Position, Settings
 from agent.report.context import ContextError, build_context
@@ -107,3 +107,23 @@ def test_us_etf_and_us_failure():
     jepq, tsla = ctx.holdings
     assert jepq.missing == ["ETF·펀드 등 개별 기업이 아니라 재무 분석 대상이 아닙니다"] and jepq.signal is None
     assert any(m.startswith("분석:") for m in tsla.missing) and tsla.signal is None
+
+
+def test_nps_data_attached():
+    ctx = build_context(Settings(), holdings(), FakeMarket(), FakeDart(TODAY), TODAY, us=FakeUs(TODAY), nps=FakeNps())
+    h = by_ticker(ctx)
+    assert h["005930"].nps == {"stake_pct": 7.5, "change_pct": -0.1, "date": "2026-09-30",
+                               "annual_rank": 1, "annual_stake_pct": 7.76}
+    assert h["000660"].nps["annual_rank"] == 2 and h["000660"].nps.get("stake_pct") is None
+    assert [c["name"] for c in ctx.nps_changes] == ["SK하이닉스", "대한항공"]
+    assert ctx.nps_changes[0]["mine"] is True and ctx.nps_changes[1]["mine"] is False
+    assert ctx.nps_annual_as_of == "2025-12-31"
+    assert ctx.portfolio.nps_overlap == ["삼성전자", "SK하이닉스"]
+
+
+def test_nps_failure_is_noted_and_report_continues():
+    ctx = build_context(Settings(), holdings(), FakeMarket(), FakeDart(TODAY), TODAY, us=FakeUs(TODAY),
+                        nps=FakeNps(fail=True))
+    assert ctx.nps_changes == []
+    assert any(m.startswith("국민연금 변동") for m in ctx.market.missing)
+    assert by_ticker(ctx)["005930"].signal is not None

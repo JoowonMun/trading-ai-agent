@@ -107,3 +107,20 @@ def test_http_error_raises(tmp_path):
 def test_mask_account():
     assert mask_account("98765432101") == "9876*****01"
     assert mask_account("") == "****"
+
+
+def test_invalidated_cached_token_is_reissued_once(tmp_path):
+    (tmp_path / "token.json").write_text(json.dumps({"token": "stale", "exp": 9e12}), encoding="utf-8")
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        if request.url.path == TOKEN_PATH:
+            return httpx.Response(200, json={"access_token": "tok", "expires_in": 86400})
+        if request.headers["authorization"] == "Bearer stale":
+            return httpx.Response(400, json={"rsp_cd": "IGW40043", "rsp_msg": "유효하지 않은 token 입니다."})
+        return make_handler([])(request)
+
+    accounts, _ = client(tmp_path, handler).holdings()
+    assert accounts and calls.count(TOKEN_PATH) == 1
+    assert json.loads((tmp_path / "token.json").read_text(encoding="utf-8"))["token"] == "tok"

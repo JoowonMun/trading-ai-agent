@@ -162,3 +162,24 @@ class FakeUs:
         months = pd.date_range(end=pd.Timestamp(today), periods=80, freq="MS")
         points = {"PER": [(m, 100e6) for m in months], "PBR": [(m, 500e6) for m in months]}
         return UsFundamentalData(quarters=quarters, points=points, shares=1e6, dps=1.0, financial=False)
+
+
+class FakeNps:
+    def __init__(self, fail=False):
+        self.fail = fail
+
+    def annual_holdings(self):
+        return {"as_of": "2025-12-31", "rows": [
+            {"rank": 1, "name": "삼성전자", "value_eok": 551095.0, "weight_pct": 21.06, "stake_pct": 7.76},
+            {"rank": 2, "name": "SK하이닉스", "value_eok": 374316.0, "weight_pct": 14.31, "stake_pct": 7.9}]}
+
+    def recent_changes(self, days):
+        if self.fail:
+            raise RuntimeError("DART 지연")
+        return [{"name": "SK하이닉스", "ticker": "000660", "corp_code": "C000660", "stake_pct": 8.1,
+                 "change_pct": 0.2, "date": "2026-10-14"},
+                {"name": "대한항공", "ticker": "003490", "corp_code": "C003490", "stake_pct": 9.97,
+                 "change_pct": -0.03, "date": "2026-10-15"}]
+
+    def stake(self, corp_code):
+        return {"C005930": {"stake_pct": 7.5, "change_pct": -0.1, "date": "2026-09-30"}}.get(corp_code)

@@ -116,7 +116,39 @@ def _analyze_us(h: HoldingContext, closes: pd.Series, us, settings: Settings, to
     _signal(h, settings)
 
 
-def build_context(settings: Settings, holdings: Holdings, market, dart, today: date, us=None) -> Context:
+def _attach_nps(nps, holdings: list[HoldingContext], dart, market_info: Market, portfolio, settings: Settings) -> tuple[str | None, list[dict]]:
+    """국민연금 보유·변동 정보를 붙인다. 실패해도 리포트는 계속된다. 연간 목록 기준일을 돌려준다."""
+    annual_as_of, by_name = None, {}
+    try:
+        annual = nps.annual_holdings()
+        annual_as_of = annual.get("as_of")
+        by_name = {r["name"]: r for r in annual["rows"]}
+    except Exception as e:
+        market_info.missing.append(f"국민연금 보유 목록: {e}")
+
+    mine = {h.ticker for h in holdings if h.market == "KR"}
+    try:
+        portfolio_changes = nps.recent_changes(days=settings.disclosure_days)
+    except Exception as e:
+        market_info.missing.append(f"국민연금 변동: {e}")
+        portfolio_changes = []
+
+    for h in holdings:
+        info = {}
+        if h.market == "KR":
+            try:
+                info.update(nps.stake(dart.corp_code(h.ticker)) or {})
+            except Exception:
+                pass  # ETF 등 DART에 없는 종목, 일시 오류
+        if h.name in by_name:
+            info.update(annual_rank=by_name[h.name]["rank"], annual_stake_pct=by_name[h.name]["stake_pct"])
+        h.nps = info or None
+
+    portfolio.nps_overlap = [h.name for h in holdings if h.name in by_name and by_name[h.name]["rank"] <= 50]
+    return annual_as_of, [{**c, "mine": c["ticker"] in mine} for c in portfolio_changes]
+
+
+def build_context(settings: Settings, holdings: Holdings, market, dart, today: date, us=None, nps=None) -> Context:
     market_info = _market(market, today)
     log.info("시장 지표 수집 완료")
     positions = aggregate_positions(holdings)
@@ -164,5 +196,11 @@ def build_context(settings: Settings, holdings: Holdings, market, dart, today: d
             log.warning("분석 실패 %s: %s", p.key, e)
             h.missing.append(f"분석: {e}")
 
+    nps_as_of, nps_changes = (None, [])
+    if nps is not None:
+        log.info("국민연금 데이터 수집")
+        nps_as_of, nps_changes = _attach_nps(nps, holding_contexts, dart, market_info, portfolio, settings)
+
     return Context(date=today.isoformat(), profile=settings.profile, market=market_info,
-                   holdings=holding_contexts, portfolio=portfolio, glossary_terms=GLOSSARY_TERMS)
+                   holdings=holding_contexts, portfolio=portfolio, glossary_terms=GLOSSARY_TERMS,
+                   nps_changes=nps_changes, nps_annual_as_of=nps_as_of)

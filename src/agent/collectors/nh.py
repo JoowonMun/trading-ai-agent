@@ -63,12 +63,18 @@ class NhClient:
     def _call(self, path: str, input_0: dict) -> dict:
         if path not in ALLOWED_PATHS:
             raise NhError(f"허용되지 않은 나무 API 경로입니다(조회 전용): {path}")
-        token = self._get_token()
-        self.sleep(0.3)  # 초당 5회 한도
-        resp = self.http.post(f"{BASE_URL}{path}", json={"Input_0": input_0}, headers={
-            "x-client-id": self.app_key, "x-client-secret": self.app_secret,
-            "authorization": f"Bearer {token}", "content-type": "application/json; charset=UTF-8",
-        })
+        for attempt in range(2):
+            self.sleep(0.3)  # 초당 5회 한도
+            resp = self.http.post(f"{BASE_URL}{path}", json={"Input_0": input_0}, headers={
+                "x-client-id": self.app_key, "x-client-secret": self.app_secret,
+                "authorization": f"Bearer {self._get_token()}", "content-type": "application/json; charset=UTF-8",
+            })
+            # 다른 곳(예: GitHub Actions)에서 새 토큰을 받으면 캐시된 토큰이 무효가 된다 → 1회 재발급
+            if attempt == 0 and (resp.status_code == 401 or "IGW40043" in resp.text):
+                self._token = None
+                self.token_file.unlink(missing_ok=True)
+                continue
+            break
         if resp.status_code != 200:
             raise NhError(f"나무 API {path} 실패: HTTP {resp.status_code} {resp.text[:200]}")
         return resp.json()

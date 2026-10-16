@@ -71,3 +71,19 @@ def test_distorted_band_warning_is_shown():
     ctx.holdings[0].valuation.note = "적정가가 현재가의 3.0배라 과거 밴드가 지금과 맞지 않을 수 있어요"
     html = render_report(ctx, None, [])
     assert "밴드 왜곡 가능" in html and "3.0배라" in html
+
+
+def test_nps_section_and_holding_line():
+    ctx = sample_context()
+    ctx.nps_annual_as_of = "2025-12-31"
+    ctx.nps_changes = [{"name": "삼성전자", "ticker": "005930", "stake_pct": 7.5, "change_pct": -0.1,
+                        "date": "2026-10-14", "mine": True},
+                       {"name": "대한항공", "ticker": "003490", "stake_pct": 9.97, "change_pct": None,
+                        "date": "2026-10-15", "mine": False}]
+    ctx.holdings[0].nps = {"stake_pct": 7.5, "change_pct": -0.1, "date": "2026-10-14",
+                           "annual_rank": 1, "annual_stake_pct": 7.76}
+    ctx.portfolio.nps_overlap = ["삼성전자"]
+    html = render_report(ctx, None, [])
+    assert "국민연금 동향" in html and "★" in html and "대한항공" in html
+    assert "국민연금 지분 7.50%" in html and "-0.10%p" in html and "국민연금 보유 1위" in html
+    assert "2025년 말 기준" in html

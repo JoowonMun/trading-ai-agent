@@ -133,6 +133,7 @@ class Context(BaseModel):
     holdings: list[HoldingContext]
     portfolio: Portfolio
     nps_changes: list[dict] = []
+    nps_annual_as_of: str | None = None
     watchlist: list[dict] = []
     glossary_terms: list[str] = []
     notes: list[str] = []
