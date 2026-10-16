@@ -115,19 +115,21 @@ def cmd_check(args) -> None:
     print("검증 통과")
 
 
-def _collect_or_notify(args) -> None:
+def _notify_on_error(step):
     """예약 실행용. 어떤 오류든 실패 메일을 보내서 '조용히 안 오는' 날이 없게 한다."""
-    try:
-        cmd_collect(args)
-    except Exception as e:
-        if not args.dry_run:
-            send_email(f"{_subject_prefix(args)} {args.date} 생성 실패",
-                       f"<p>오늘 리포트를 만들지 못했습니다: {escape(f'{type(e).__name__}: {e}')}</p>")
-        raise
+    def wrapped(args):
+        try:
+            return step(args)
+        except Exception as e:
+            if not args.dry_run:
+                send_email(f"{_subject_prefix(args)} {args.date} 생성 실패",
+                           f"<p>오늘 리포트를 만들지 못했습니다: {escape(f'{type(e).__name__}: {e}')}</p>")
+            raise
+    return wrapped
 
 
 def cmd_run(args) -> None:
-    _collect_or_notify(args)
+    _notify_on_error(cmd_collect)(args)
     cmd_publish(args)
 
 
@@ -145,12 +147,15 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--out", type=Path, default=Path("out"))
     parser.add_argument("--config-dir", type=Path, default=Path("config"))
     parser.add_argument("--dry-run", action="store_true", help="메일을 보내지 않고 preview.html만 생성")
-    parser.add_argument("--notify-on-error", action="store_true", help="collect 실패 시 실패 알림 메일 발송")
+    parser.add_argument("--notify-on-error", action="store_true", help="collect·publish 실패 시 실패 알림 메일 발송")
     args = parser.parse_args(argv)
     args.date = args.date or today_kst()
 
-    collect = _collect_or_notify if args.notify_on_error else cmd_collect
-    {"collect": collect, "check": cmd_check, "publish": cmd_publish, "run": cmd_run}[args.command](args)
+    commands = {"collect": cmd_collect, "check": cmd_check, "publish": cmd_publish, "run": cmd_run}
+    step = commands[args.command]
+    if args.notify_on_error and args.command in ("collect", "publish"):
+        step = _notify_on_error(step)
+    step(args)
 
 
 if __name__ == "__main__":

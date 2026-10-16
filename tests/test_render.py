@@ -87,3 +87,10 @@ def test_nps_section_and_holding_line():
     assert "국민연금 동향" in html and "★" in html and "대한항공" in html
     assert "국민연금 지분 7.50%" in html and "-0.10%p" in html and "국민연금 보유 1위" in html
     assert "2025년 말 기준" in html
+
+
+def test_holding_with_only_annual_nps_rank_renders():
+    ctx = sample_context()
+    ctx.holdings[0].nps = {"annual_rank": 1, "annual_stake_pct": 7.76}
+    html = render_report(ctx, None, [])
+    assert "국민연금 보유 1위" in html and "국민연금 지분" not in html

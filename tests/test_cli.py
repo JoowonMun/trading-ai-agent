@@ -173,3 +173,15 @@ def test_collect_with_notify_on_error_sends_failure_email(tmp_path, monkeypatch)
         cli.main(["collect", "--notify-on-error", "--date", "2026-10-15", "--out", str(tmp_path / "out"),
                   "--config-dir", str(config)])
     assert sent == ["[투자 리포트] 2026-10-15 생성 실패"]
+
+
+def test_publish_with_notify_on_error_sends_failure_email(tmp_path, monkeypatch):
+    import pytest
+    config, _ = setup_dirs(tmp_path)
+    sent = []
+    monkeypatch.setattr(cli, "send_email", lambda subject, html: sent.append(subject))
+    monkeypatch.setattr(cli, "render_report", lambda *a, **k: (_ for _ in ()).throw(ValueError("템플릿 오류")))
+    with pytest.raises(ValueError):
+        cli.main(["publish", "--notify-on-error", "--date", "2026-10-15", "--out", str(tmp_path / "out"),
+                  "--config-dir", str(config)])
+    assert sent == ["[투자 리포트] 2026-10-15 생성 실패"]

@@ -104,8 +104,10 @@
   <p style="margin:10px 0 0;font-size:12px;color:#57534e;">흐름(보조): 20일선 {{ h.price.ma20|money(h.market) }} · 60일선 {{ h.price.ma60|money(h.market) }} · 120일선 {{ h.price.ma120|money(h.market) }} · RSI {{ h.price.rsi14|num(1) }} · 52주 위치 {{ h.price.pos_52w_pct|num(0) }}/100</p>
   {% endif %}
 
-  {% if h.nps %}
-  <p style="margin:6px 0 0;font-size:12px;color:#57534e;">🏛 {% if h.nps.stake_pct is not none %}국민연금 지분 {{ "%.2f"|format(h.nps.stake_pct) }}%{% if h.nps.change_pct is not none %} ({{ "%+.2f"|format(h.nps.change_pct) }}%p){% endif %} · {{ h.nps.date }} 신고{% endif %}{% if h.nps.stake_pct is not none and h.nps.annual_rank %} · {% endif %}{% if h.nps.annual_rank %}국민연금 보유 {{ h.nps.annual_rank }}위{% endif %}</p>
+  {% if h.nps %}{% set n = h.nps %}{% set parts = [] %}
+  {% if n.get('stake_pct') is not none %}{% set _ = parts.append("국민연금 지분 " ~ "%.2f"|format(n.stake_pct) ~ "%" ~ (" (" ~ "%+.2f"|format(n.change_pct) ~ "%p)" if n.get('change_pct') is not none else "") ~ " · " ~ n.date ~ " 신고") %}{% endif %}
+  {% if n.get('annual_rank') %}{% set _ = parts.append("국민연금 보유 " ~ n.annual_rank ~ "위") %}{% endif %}
+  {% if parts %}<p style="margin:6px 0 0;font-size:12px;color:#57534e;">🏛 {{ parts|join(" · ") }}</p>{% endif %}
   {% endif %}
 
   {% if h.flows %}
