@@ -402,3 +402,9 @@ cash_krw: 0
 
 - **업종·테마 비중 조언** (2026-10-16 보류): 업종은 자동 분류(미국 yfinance sector/industry, 국내 DART KSIC→업종명), 테마는 개인 파일 `config/themes.yaml`(git 제외), ETF는 구성 업종 비율로 나눠 계산(yfinance funds_data). 한 업종 30% 초과 시 "집중 주의" + 규칙 기반 조언. 특정 업종 매수 추천은 하지 않음
 - **API가 없는 증권사(예: 미래에셋증권) 연동** (2026-10-15 보류): 개인용 REST API 없음(AnyLink는 HTS 플러그인). API가 생기면 나무와 같은 방식으로 추가
+
+## 15. 국민연금 데이터 소스 (2026-10-16 확정)
+
+- 국내 연간 보유 목록: 공공데이터포털 파일데이터 CSV(키 불필요, 연말 기준) — `collectors/nps.py`
+- 국내 지분 변동: DART 지분공시(pblntf_ty=D) 중 신고인 "국민연금공단" + 회사별 `elestock.json`(10% 이상 주주 소유보고)로 지분율·직전 대비 변동
+- 미국 보유(13F): **SEC EDGAR는 한국 IP와 GitHub Actions(Azure) IP 모두 403** → 13F 원문을 공개하는 `13f.info`의 JSON(티커·CUSIP 포함) 사용. 분기 비교는 CUSIP 기준(회사명 표기 변경 대응), CUSIP가 바뀐 종목은 회사명으로 보조 매칭. 비공식 제3자 사이트라 하루 3건 이내 요청 + 분기 보고서 캐시

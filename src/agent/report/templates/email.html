@@ -144,7 +144,7 @@
 {% endif %}
 {% if context.nps_us %}{% set u = context.nps_us %}
 <div style="font-size:14px;font-weight:600;margin:16px 0 4px;">국민연금 미국 보유 (13F)</div>
-<p style="margin:0 0 6px;font-size:12px;color:#78716c;">{{ u.period }} 기준 (직전 {{ u.prev_period }} 대비, {{ u.filed }} 공개 · 분기마다 약 45일 늦게 공개돼요)</p>
+<p style="margin:0 0 6px;font-size:12px;color:#78716c;">{{ u.period }} 말 기준 (직전 {{ u.prev_period }} 대비 · 분기가 끝나고 약 45일 뒤 공개돼요)</p>
 <table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px;">
 <tr><th style="{{ TH }}text-align:left;">많이 늘린 종목</th><th style="{{ TH }}text-align:right;">보유 순위</th><th style="{{ TH }}text-align:right;">주식 수 변화</th></tr>
 {% for p in u.top_buys %}<tr><td style="{{ TD }}">{{ p.name }}</td><td style="{{ TD }}text-align:right;">{{ p.rank }}위</td><td style="{{ TD }}text-align:right;color:#15803d;">{{ "신규" if p.new else "%+.1f"|format(p.change_pct) ~ "%" }}</td></tr>{% endfor %}

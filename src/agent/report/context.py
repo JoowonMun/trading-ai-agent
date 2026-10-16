@@ -161,14 +161,18 @@ def _attach_nps_us(sec, holdings: list[HoldingContext], us_names: dict, market_i
         market_info.missing.append(f"국민연금 미국 보유: {str(e).splitlines()[0]}")
         return None
     for h in holdings:
-        name = us_names.get(h.ticker)
-        pos = report["positions"].get(normalize_issuer(name)) if name else None
+        if h.market != "US":
+            continue
+        key = report.get("tickers", {}).get(h.ticker)
+        if key is None and us_names.get(h.ticker):
+            key = report.get("names", {}).get(normalize_issuer(us_names[h.ticker]))
+        pos = report["positions"].get(key) if key else None
         if pos:
             h.nps = {**(h.nps or {}), "us_rank": pos["rank"], "us_shares": pos["shares"],
                      "us_change_pct": pos["change_pct"], "us_new": pos["new"], "us_period": report["period"]}
     matched = sum(1 for h in holdings if h.nps and h.nps.get("us_rank"))
     log.info("13F %s 기준 %d종목, 내 종목 매칭 %d개", report["period"], len(report["positions"]), matched)
-    return {k: v for k, v in report.items() if k != "positions"}
+    return {k: v for k, v in report.items() if k not in ("positions", "tickers", "names")}
 
 
 def build_context(settings: Settings, holdings: Holdings, market, dart, today: date, us=None, nps=None,

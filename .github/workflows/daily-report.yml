@@ -48,17 +48,6 @@ jobs:
         run: |
           echo "REPORT_DATE=$(uv run python -c 'from agent.config import today_kst; print(today_kst())')" >> "$GITHUB_ENV"
 
-      - name: (임시) SEC 접속 진단
-        if: ${{ inputs.dry_run }}
-        run: |
-          for ua in "trading-ai-agent $MAIL_FROM" "Joowon Mun $MAIL_FROM" "Mozilla/5.0 (compatible; research; $MAIL_FROM)"; do
-            for url in https://data.sec.gov/submissions/CIK0001608046.json https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany\&CIK=1608046\&type=13F-HR; do
-              code=$(curl -s -o /dev/null -w '%{http_code}' -A "$ua" -H 'Accept-Encoding: gzip, deflate' --max-time 20 "$url")
-              echo "SEC $code ${ua%% *} ${url:8:40}"
-            done
-          done
-          curl -s --max-time 10 https://ipinfo.io/org; echo
-
       - name: DART 캐시 복원
         uses: actions/cache/restore@v4
         with:

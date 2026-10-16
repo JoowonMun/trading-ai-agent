@@ -136,7 +136,7 @@ def test_nps_us_13f_attached():
     assert apple.nps == {"us_rank": 1, "us_shares": 2000.0, "us_change_pct": 100.0, "us_new": False,
                          "us_period": "2026-06-30"}
     assert ctx.nps_us["period"] == "2026-06-30" and ctx.nps_us["top_buys"][0]["name"] == "APPLE INC"
-    assert "positions" not in ctx.nps_us   # 전체 목록은 context에 넣지 않는다
+    assert "positions" not in ctx.nps_us and "tickers" not in ctx.nps_us   # 전체 목록은 context에 넣지 않는다
 
 
 def test_nps_us_failure_noted():

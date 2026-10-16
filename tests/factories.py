@@ -196,5 +196,5 @@ class FakeSec:
         apple = {"name": "APPLE INC", "shares": 2000.0, "value": 5e8, "rank": 1, "prev_shares": 1000.0,
                  "change_pct": 100.0, "new": False, "added_value": 2.5e8}
         return {"period": "2026-06-30", "filed": "2026-08-12", "prev_period": "2026-03-31",
-                "positions": {"APPLE": apple}, "top_holdings": [apple], "top_buys": [apple], "top_sells": [],
+                "positions": {"037833100": apple}, "tickers": {"AAPL": "037833100"}, "names": {}, "top_holdings": [apple], "top_buys": [apple], "top_sells": [],
                 "sold_out": [{"name": "OLDCO CORP", "prev_shares": 50.0, "prev_value": 4e5}]}
