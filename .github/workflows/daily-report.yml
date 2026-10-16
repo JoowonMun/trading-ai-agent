@@ -1,0 +1,82 @@
+name: daily-report
+
+on:
+  schedule:
+    - cron: "0 22 * * 0-4"   # 월~금 07:00 KST (UTC 전날 22:00)
+  workflow_dispatch:          # Actions 탭에서 수동 실행
+
+concurrency:
+  group: daily-report
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DART_API_KEY: ${{ secrets.DART_API_KEY }}
+      NH_APP_KEY: ${{ secrets.NH_APP_KEY }}
+      NH_APP_SECRET: ${{ secrets.NH_APP_SECRET }}
+      KRX_ID: ${{ secrets.KRX_ID }}
+      KRX_PW: ${{ secrets.KRX_PW }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      MAIL_FROM: ${{ secrets.MAIL_FROM }}
+      MAIL_TO: ${{ secrets.MAIL_TO }}
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: 의존성 설치
+        run: uv sync --frozen > /dev/null
+
+      - name: 설정 파일 준비 (나무 계좌는 API로 조회하므로 수동 보유는 비움)
+        run: printf 'accounts: []\ncash_krw: 0\n' > config/holdings.yaml
+
+      - name: 기준일 계산 (한국시간)
+        run: echo "REPORT_DATE=$(uv run python -c 'from agent.config import today_kst; print(today_kst())')" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v4
+        with:
+          path: .cache/dart
+          key: dart-${{ github.run_id }}
+          restore-keys: dart-
+
+      # 로그는 저장소를 공개하면 누구나 볼 수 있으므로, 보유 내역이 담긴 출력은 파일로만 남긴다
+      - name: 데이터 수집·계산 (실패 시 실패 알림 메일)
+        run: |
+          mkdir -p out
+          if uv run python -m agent collect --notify-on-error --date "$REPORT_DATE" > out/collect.log 2>&1; then
+            echo "수집 완료"
+          else
+            echo "수집 실패 — 실패 알림 메일 발송됨"; tail -n 3 out/collect.log | sed -E 's/[0-9]{6,}/<num>/g'; exit 1
+          fi
+
+      - name: AI 해설 작성 (Claude Code, 구독 인증)
+        continue-on-error: true   # 실패해도 숫자 리포트는 발송
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          PROMPT="$(sed "s/{{DATE}}/$REPORT_DATE/g" prompts/daily-prompt.md)"
+          if npx -y @anthropic-ai/claude-code@2.1.301 -p "$PROMPT" \
+              --model claude-opus-5-5 \
+              --permission-mode acceptEdits \
+              --allowedTools "Read" "Write" "Edit" "Bash(uv run python -m agent check:*)" \
+              --output-format json > out/claude.json 2>&1; then
+            echo "AI 해설 작성 완료"
+          else
+            echo "AI 해설 실패 — 숫자 리포트로 발송"; exit 1
+          fi
+
+      - name: 검증 후 메일 발송
+        run: |
+          if uv run python -m agent publish --date "$REPORT_DATE" > out/publish.log 2>&1; then
+            echo "발송 완료"
+          else
+            echo "발송 실패"; tail -n 3 out/publish.log | sed -E 's/[0-9]{6,}/<num>/g'; exit 1
+          fi

@@ -161,3 +161,15 @@ def test_check_command_reports_validation_result(tmp_path, capsys):
         cli.main(base)
     assert exc.value.code == 1
     assert "999,999원" in capsys.readouterr().out
+
+
+def test_collect_with_notify_on_error_sends_failure_email(tmp_path, monkeypatch):
+    import pytest
+    config, _ = setup_dirs(tmp_path)
+    sent = []
+    monkeypatch.setattr(cli, "send_email", lambda subject, html: sent.append(subject))
+    monkeypatch.setattr(cli, "cmd_collect", lambda args: (_ for _ in ()).throw(RuntimeError("DART 다운")))
+    with pytest.raises(RuntimeError):
+        cli.main(["collect", "--notify-on-error", "--date", "2026-10-15", "--out", str(tmp_path / "out"),
+                  "--config-dir", str(config)])
+    assert sent == ["[투자 리포트] 2026-10-15 생성 실패"]
