@@ -86,3 +86,10 @@ def test_missing_values_become_none():
 def test_no_financial_statements_raises():
     with pytest.raises(RuntimeError, match="재무"):
         load(FakeTicker(quarterly_income=pd.DataFrame()))
+
+
+@pytest.mark.live
+def test_live_nvda():
+    data = YahooFundamentals().load("NVDA", TODAY)
+    assert len(data.quarters) >= 4 and data.shares > 1e9
+    assert sum(1 for _, v in data.points["PER"] if v) >= 5

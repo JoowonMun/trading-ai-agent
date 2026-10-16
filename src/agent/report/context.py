@@ -11,8 +11,10 @@ from agent.analysis.fundamentals import compute_fundamentals
 from agent.analysis.indicators import moving_average, position_in_52w, rsi
 from agent.analysis.portfolio import AggregatedPosition, aggregate_positions, summarize, value_positions
 from agent.analysis.signals import decide_signal
-from agent.analysis.valuation import band_valuation, choose_method, is_financial, monthly_multiples
-from agent.collectors.dart import NotInDart, disclosure_url
+from agent.analysis.valuation import (band_valuation, choose_method, earnings_points, is_financial,
+                                      multiples_from_points)
+from agent.collectors.common import NotACompany
+from agent.collectors.dart import disclosure_url
 from agent.config import Holdings, Settings
 from agent.report.schema import (Context, Disclosure, Flows, HoldingContext, IndexQuote, Market, PositionInfo,
                                  PriceSnapshot)
@@ -66,16 +68,9 @@ def _analyze_kr(h: HoldingContext, closes: pd.Series, market, dart, settings: Se
     if not quarters or not shares:
         raise RuntimeError("재무제표 또는 발행주식수를 찾지 못했습니다")
 
-    close = h.price.close
-    h.fundamentals = compute_fundamentals(quarters, close * shares, close, dart.dividend_per_share(corp))
-    h.financial_sector = is_financial(company.get("induty_code"))
-    method = choose_method(h.financial_sector, h.fundamentals.ttm_net_income)
-    monthly = closes.resample("ME").last().dropna()
-    multiples = monthly_multiples(monthly, quarters, shares, method)
-    current = h.fundamentals.per if method == "PER" else h.fundamentals.pbr
-    h.valuation = band_valuation(multiples, method, current, close, h.position.avg_price, settings.profile,
-                                 settings.band_years, settings.min_band_points)
-    h.assessments = assess(h.fundamentals, h.valuation, h.financial_sector)
+    points = {m: earnings_points(quarters, m) for m in ("PER", "PBR")}
+    _value(h, closes, quarters, points, shares, dart.dividend_per_share(corp),
+           is_financial(company.get("induty_code")), settings, decimals=0)
 
     for row in dart.disclosures(corp, today - timedelta(days=settings.disclosure_days), today):
         category, negative = classify(row["report_nm"])
@@ -90,12 +85,38 @@ def _analyze_kr(h: HoldingContext, closes: pd.Series, market, dart, settings: Se
     except Exception as e:
         h.missing.append(f"수급: {e}")
 
+    _signal(h, settings)
+
+
+def _value(h: HoldingContext, closes: pd.Series, quarters, points, shares, dps, financial: bool,
+           settings: Settings, decimals: int) -> None:
+    """지표 → 밴드 가격 → 지표 평가 (국내·미국 공통)."""
+    close = h.price.close
+    h.fundamentals = compute_fundamentals(quarters, close * shares, close, dps)
+    h.financial_sector = financial
+    method = choose_method(financial, h.fundamentals.ttm_net_income)
+    multiples = multiples_from_points(closes.resample("ME").last().dropna(), points[method], shares)
+    current = h.fundamentals.per if method == "PER" else h.fundamentals.pbr
+    h.valuation = band_valuation(multiples, method, current, close, h.position.avg_price, settings.profile,
+                                 settings.band_years, settings.min_band_points, decimals=decimals)
+    h.assessments = assess(h.fundamentals, h.valuation, financial)
+
+
+def _signal(h: HoldingContext, settings: Settings) -> None:
     h.signal, h.signal_reasons = decide_signal(
-        close, h.valuation, h.fundamentals, h.position.weight_pct or 0, settings.profile,
+        h.price.close, h.valuation, h.fundamentals, h.position.weight_pct or 0, settings.profile,
         any(d.negative for d in h.disclosures), h.financial_sector)
 
 
-def build_context(settings: Settings, holdings: Holdings, market, dart, today: date) -> Context:
+def _analyze_us(h: HoldingContext, closes: pd.Series, us, settings: Settings, today: date) -> None:
+    data = us.load(h.ticker, today)
+    if not data.quarters or not data.shares:
+        raise RuntimeError("재무제표 또는 발행주식수를 찾지 못했습니다")
+    _value(h, closes, data.quarters, data.points, data.shares, data.dps, data.financial, settings, decimals=2)
+    _signal(h, settings)
+
+
+def build_context(settings: Settings, holdings: Holdings, market, dart, today: date, us=None) -> Context:
     market_info = _market(market, today)
     positions = aggregate_positions(holdings)
     start = today - timedelta(days=365 * (settings.band_years + 1))
@@ -126,12 +147,15 @@ def build_context(settings: Settings, holdings: Holdings, market, dart, today: d
         h.price = price_snapshot(series[p.key])
         if not p.analyze:
             continue
-        if p.market == "US":
-            h.missing.append("미국 종목 분석은 2단계에서 추가됩니다")
-            continue
         try:
-            _analyze_kr(h, series[p.key], market, dart, settings, today)
-        except NotInDart:
+            if p.market == "US":
+                if us is None:
+                    h.missing.append("미국 재무 데이터 소스가 설정되지 않았습니다")
+                    continue
+                _analyze_us(h, series[p.key], us, settings, today)
+            else:
+                _analyze_kr(h, series[p.key], market, dart, settings, today)
+        except NotACompany:
             h.missing.append("ETF·펀드 등 개별 기업이 아니라 재무 분석 대상이 아닙니다")
         except Exception as e:
             log.warning("분석 실패 %s: %s", p.key, e)

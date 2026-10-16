@@ -141,3 +141,24 @@ def sample_context():
         ),
         glossary_terms=["PER", "ROE"],
     )
+
+
+class FakeUs:
+    """YahooFundamentals 대역: 5개 분기 + 6년치 연간 실적 시점."""
+
+    def __init__(self, today, etf=(), fail=()):
+        self.today, self.etf, self.fail = today, set(etf), set(fail)
+
+    def load(self, symbol, today):
+        from agent.analysis.financials import QuarterFigures
+        from agent.collectors.common import NotACompany
+        from agent.collectors.us_fundamentals import UsFundamentalData
+        if symbol in self.etf:
+            raise NotACompany(f"{symbol}는 ETF입니다")
+        if symbol in self.fail:
+            raise RuntimeError("yfinance 오류")
+        quarters = [QuarterFigures(2025 + (q > 4), (q - 1) % 4 + 1, 100e6, 30e6, 25e6, 500e6, 500e6, 200e6)
+                    for q in range(3, 8)]
+        months = pd.date_range(end=pd.Timestamp(today), periods=80, freq="MS")
+        points = {"PER": [(m, 100e6) for m in months], "PBR": [(m, 500e6) for m in months]}
+        return UsFundamentalData(quarters=quarters, points=points, shares=1e6, dps=1.0, financial=False)

@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from agent.collectors.dart import DartClient
 from agent.collectors.nh import NhClient
 from agent.collectors.prices import MarketData
+from agent.collectors.us_fundamentals import YahooFundamentals
 from agent.config import Holdings, Settings, combine_holdings, load_holdings, load_settings, today_kst
 from agent.delivery.email import send_email
 from agent.report.context import build_context
@@ -55,7 +56,7 @@ def cmd_collect(args) -> Path:
     notes: list[str] = []
     holdings = resolve_holdings(settings, load_holdings(args.config_dir / "holdings.yaml"), notes)
     dart = DartClient(os.environ["DART_API_KEY"], cache_dir=Path(".cache/dart"), today=args.date)
-    context = build_context(settings, holdings, MarketData(), dart, args.date)
+    context = build_context(settings, holdings, MarketData(), dart, args.date, us=YahooFundamentals())
     context.notes = notes
     day = _day_dir(args)
     day.mkdir(parents=True, exist_ok=True)

@@ -1,7 +1,7 @@
 from datetime import date
 
 import pytest
-from factories import FakeDart, FakeMarket
+from factories import FakeDart, FakeMarket, FakeUs
 
 from agent.config import Account, Holdings, Position, Settings
 from agent.report.context import ContextError, build_context
@@ -22,9 +22,9 @@ def holdings():
     ])
 
 
-def build(market=None, dart=None, h=None):
+def build(market=None, dart=None, h=None, us=None):
     return build_context(Settings(), h or holdings(), market or FakeMarket(),
-                         dart or FakeDart(TODAY, negative={"000660"}), TODAY)
+                         dart or FakeDart(TODAY, negative={"000660"}), TODAY, us=us or FakeUs(TODAY))
 
 
 def by_ticker(ctx):
@@ -45,7 +45,11 @@ def test_happy_path():
     assert samsung.assessments["roe"] in {"good", "neutral", "caution"}
     assert h["000660"].signal == "review"
     assert h["000660"].disclosures[0].negative
-    assert h["AAPL"].signal is None and any("2단계" in m for m in h["AAPL"].missing)
+    apple = h["AAPL"]
+    assert apple.signal in {"add", "hold", "trim", "review"} and apple.missing == []
+    assert apple.valuation.method == "PER" and not apple.valuation.insufficient
+    assert apple.valuation.fair != round(apple.valuation.fair)  # 달러는 소수점 둘째 자리까지
+    assert apple.fundamentals.per > 0 and apple.assessments
     assert h["360750"].signal is None and h["360750"].price is not None and h["360750"].valuation is None
     assert ctx.portfolio.total_krw > 0
     assert "PER" in ctx.glossary_terms
@@ -94,3 +98,12 @@ def test_ticker_not_in_dart_is_noted_not_failed():
     etf = build(dart=EtfDart(TODAY), h=h).holdings[0]
     assert etf.signal is None and etf.price is not None
     assert etf.missing == ["ETF·펀드 등 개별 기업이 아니라 재무 분석 대상이 아닙니다"]
+
+
+def test_us_etf_and_us_failure():
+    h = Holdings(accounts=[Account(name="us", broker="nh", market="US", asset_class="us", positions=[
+        Position(ticker="JEPQ", qty=1, avg_price=50), Position(ticker="TSLA", qty=1, avg_price=200)])])
+    ctx = build(h=h, us=FakeUs(TODAY, etf={"JEPQ"}, fail={"TSLA"}))
+    jepq, tsla = ctx.holdings
+    assert jepq.missing == ["ETF·펀드 등 개별 기업이 아니라 재무 분석 대상이 아닙니다"] and jepq.signal is None
+    assert any(m.startswith("분석:") for m in tsla.missing) and tsla.signal is None
