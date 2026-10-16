@@ -5,9 +5,9 @@ profile:
   rebalance_band_pct: 5
   buy_tranches: 3
 target_allocation:
-  domestic: 30
-  us: 40
-  index: 30
+  domestic: 15
+  us: 45
+  index: 40
 band_years: 5
 min_band_points: 36
 disclosure_days: 7

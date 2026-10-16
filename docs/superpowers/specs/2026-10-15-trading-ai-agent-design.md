@@ -397,3 +397,8 @@ cash_krw: 0
 ### 나중 참고: 자동매매(5단계)용 주문 API — 현재 미사용
 국내 `/krstock/order/v1/` `cashBuy`·`cashSell`·`creditBuy`·`creditSell`·`modify`·`cancel`·`reservedOrder`·`reservedCancel` / 해외 `/gbstock/order/v1/` `buy`·`sell`·`modify`·`cancel`·`reservedSubmit`·`reservedCancel`.
 자동매매 착수 시: 모의투자 도메인과 03 계좌로 먼저 검증, 주문 전 직전 응답의 `rsp_msg` 확인(SDK 권고: `rsp_cd` 단일 비교로 성공 판정 금지), 주문 경로는 별도 허용 목록·금액 상한·사용자 확인 단계를 둔다.
+
+## 14. 나중에 할 것 (보류 목록)
+
+- **업종·테마 비중 조언** (2026-10-16 보류): 업종은 자동 분류(미국 yfinance sector/industry, 국내 DART KSIC→업종명), 테마는 개인 파일 `config/themes.yaml`(git 제외), ETF는 구성 업종 비율로 나눠 계산(yfinance funds_data). 한 업종 30% 초과 시 "집중 주의" + 규칙 기반 조언. 특정 업종 매수 추천은 하지 않음
+- **API가 없는 증권사(예: 미래에셋증권) 연동** (2026-10-15 보류): 개인용 REST API 없음(AnyLink는 HTS 플러그인). API가 생기면 나무와 같은 방식으로 추가
