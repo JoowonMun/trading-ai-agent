@@ -156,7 +156,8 @@ def _attach_nps_us(sec, holdings: list[HoldingContext], us_names: dict, market_i
     try:
         report = sec.report()
     except Exception as e:
-        log.warning("13F 수집 실패: %s", type(e).__name__)
+        status = getattr(getattr(e, "response", None), "status_code", None)
+        log.warning("13F 수집 실패: %s %s", type(e).__name__, status or "")
         market_info.missing.append(f"국민연금 미국 보유: {str(e).splitlines()[0]}")
         return None
     for h in holdings:
