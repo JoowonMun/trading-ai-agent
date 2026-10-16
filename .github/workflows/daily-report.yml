@@ -89,7 +89,7 @@ jobs:
       - name: 검증 후 메일 발송
         run: |
           if uv run python -m agent publish --date "$REPORT_DATE" > out/publish.log 2>&1; then
-            echo "발송 완료"
+            echo "발송 완료"; grep -oE "AI 해설 상태: .*" out/publish.log || echo "AI 해설 없음"
           else
             echo "발송 실패"; tail -n 3 out/publish.log | sed -E 's/[0-9]{6,}/<num>/g'; exit 1
           fi

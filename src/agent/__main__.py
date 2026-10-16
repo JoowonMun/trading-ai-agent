@@ -79,6 +79,7 @@ def cmd_publish(args) -> Path:
         if errors:
             notes.append("AI 분석 검증 실패 → 숫자 리포트로 대체")
             notes.extend(errors[:5])
+        log.info("AI 해설 상태: %s", f"검증 실패 {len(errors)}건" if errors else "검증 통과")
     else:
         notes.append("AI 분석 없음 → 숫자 리포트")
 
