@@ -161,7 +161,8 @@ class FakeUs:
                     for q in range(3, 8)]
         months = pd.date_range(end=pd.Timestamp(today), periods=80, freq="MS")
         points = {"PER": [(m, 100e6) for m in months], "PBR": [(m, 500e6) for m in months]}
-        return UsFundamentalData(quarters=quarters, points=points, shares=1e6, dps=1.0, financial=False)
+        return UsFundamentalData(quarters=quarters, points=points, shares=1e6, dps=1.0, financial=False,
+                                 name="Apple Inc.")
 
 
 class FakeNps:
@@ -183,3 +184,17 @@ class FakeNps:
 
     def stake(self, corp_code):
         return {"C005930": {"stake_pct": 7.5, "change_pct": -0.1, "date": "2026-09-30"}}.get(corp_code)
+
+
+class FakeSec:
+    def __init__(self, fail=False):
+        self.fail = fail
+
+    def report(self):
+        if self.fail:
+            raise RuntimeError("HTTP 403")
+        apple = {"name": "APPLE INC", "shares": 2000.0, "value": 5e8, "rank": 1, "prev_shares": 1000.0,
+                 "change_pct": 100.0, "new": False, "added_value": 2.5e8}
+        return {"period": "2026-06-30", "filed": "2026-08-12", "prev_period": "2026-03-31",
+                "positions": {"APPLE": apple}, "top_holdings": [apple], "top_buys": [apple], "top_sells": [],
+                "sold_out": [{"name": "OLDCO CORP", "prev_shares": 50.0, "prev_value": 4e5}]}

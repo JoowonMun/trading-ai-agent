@@ -14,6 +14,7 @@ from agent.collectors.dart import DartClient
 from agent.collectors.nh import NhClient
 from agent.collectors.nps import NpsClient
 from agent.collectors.prices import MarketData
+from agent.collectors.sec13f import Sec13fClient
 from agent.collectors.us_fundamentals import YahooFundamentals
 from agent.config import Holdings, Settings, combine_holdings, load_holdings, load_settings, today_kst
 from agent.delivery.email import send_email
@@ -59,7 +60,9 @@ def cmd_collect(args) -> Path:
     holdings = resolve_holdings(settings, load_holdings(args.config_dir / "holdings.yaml"), notes)
     dart = DartClient(os.environ["DART_API_KEY"], cache_dir=Path(".cache/dart"), today=args.date)
     nps = NpsClient(os.environ["DART_API_KEY"], cache_dir=Path(".cache/dart"), today=args.date)
-    context = build_context(settings, holdings, MarketData(), dart, args.date, us=YahooFundamentals(), nps=nps)
+    sec = Sec13fClient(f"trading-ai-agent {os.environ.get('MAIL_FROM', 'unknown@example.com')}", Path(".cache/dart"))
+    context = build_context(settings, holdings, MarketData(), dart, args.date, us=YahooFundamentals(), nps=nps,
+                            sec=sec)
     context.notes = notes
     day = _day_dir(args)
     day.mkdir(parents=True, exist_ok=True)

@@ -15,6 +15,7 @@ from agent.analysis.valuation import (band_valuation, choose_method, earnings_po
                                       multiples_from_points)
 from agent.collectors.common import NotACompany
 from agent.collectors.dart import disclosure_url
+from agent.collectors.sec13f import normalize_issuer
 from agent.config import Holdings, Settings
 from agent.report.schema import (Context, Disclosure, Flows, HoldingContext, IndexQuote, Market, PositionInfo,
                                  PriceSnapshot)
@@ -108,12 +109,14 @@ def _signal(h: HoldingContext, settings: Settings) -> None:
         any(d.negative for d in h.disclosures), h.financial_sector)
 
 
-def _analyze_us(h: HoldingContext, closes: pd.Series, us, settings: Settings, today: date) -> None:
+def _analyze_us(h: HoldingContext, closes: pd.Series, us, settings: Settings, today: date) -> str | None:
+    """분석하고 영문 회사명(13F 매칭용)을 돌려준다."""
     data = us.load(h.ticker, today)
     if not data.quarters or not data.shares:
         raise RuntimeError("재무제표 또는 발행주식수를 찾지 못했습니다")
     _value(h, closes, data.quarters, data.points, data.shares, data.dps, data.financial, settings, decimals=2)
     _signal(h, settings)
+    return data.name
 
 
 def _attach_nps(nps, holdings: list[HoldingContext], dart, market_info: Market, portfolio, settings: Settings) -> tuple[str | None, list[dict]]:
@@ -148,7 +151,27 @@ def _attach_nps(nps, holdings: list[HoldingContext], dart, market_info: Market, 
     return annual_as_of, [{**c, "mine": c["ticker"] in mine} for c in portfolio_changes]
 
 
-def build_context(settings: Settings, holdings: Holdings, market, dart, today: date, us=None, nps=None) -> Context:
+def _attach_nps_us(sec, holdings: list[HoldingContext], us_names: dict, market_info: Market) -> dict | None:
+    """국민연금 미국 보유(13F)를 붙인다. 내 미국 종목은 영문 회사명으로 매칭한다."""
+    try:
+        report = sec.report()
+    except Exception as e:
+        log.warning("13F 수집 실패: %s", type(e).__name__)
+        market_info.missing.append(f"국민연금 미국 보유: {str(e).splitlines()[0]}")
+        return None
+    for h in holdings:
+        name = us_names.get(h.ticker)
+        pos = report["positions"].get(normalize_issuer(name)) if name else None
+        if pos:
+            h.nps = {**(h.nps or {}), "us_rank": pos["rank"], "us_shares": pos["shares"],
+                     "us_change_pct": pos["change_pct"], "us_new": pos["new"], "us_period": report["period"]}
+    matched = sum(1 for h in holdings if h.nps and h.nps.get("us_rank"))
+    log.info("13F %s 기준 %d종목, 내 종목 매칭 %d개", report["period"], len(report["positions"]), matched)
+    return {k: v for k, v in report.items() if k != "positions"}
+
+
+def build_context(settings: Settings, holdings: Holdings, market, dart, today: date, us=None, nps=None,
+                  sec=None) -> Context:
     market_info = _market(market, today)
     log.info("시장 지표 수집 완료")
     positions = aggregate_positions(holdings)
@@ -170,6 +193,7 @@ def build_context(settings: Settings, holdings: Holdings, market, dart, today: d
     portfolio = summarize(value_positions(positions, closes, market_info.fx_usdkrw), holdings.cash_krw, settings)
 
     holding_contexts = []
+    us_names: dict[str, str | None] = {}
     for p in positions:
         h = HoldingContext(ticker=p.ticker, name=p.name, market=p.market, asset_class=p.asset_class,
                            position=PositionInfo(qty=p.qty, avg_price=p.avg_price,
@@ -187,7 +211,7 @@ def build_context(settings: Settings, holdings: Holdings, market, dart, today: d
                 if us is None:
                     h.missing.append("미국 재무 데이터 소스가 설정되지 않았습니다")
                     continue
-                _analyze_us(h, series[p.key], us, settings, today)
+                us_names[h.ticker] = _analyze_us(h, series[p.key], us, settings, today)
             else:
                 _analyze_kr(h, series[p.key], market, dart, settings, today)
         except NotACompany:
@@ -201,6 +225,11 @@ def build_context(settings: Settings, holdings: Holdings, market, dart, today: d
         log.info("국민연금 데이터 수집")
         nps_as_of, nps_changes = _attach_nps(nps, holding_contexts, dart, market_info, portfolio, settings)
 
+    nps_us = None
+    if sec is not None:
+        log.info("국민연금 미국 보유(13F) 수집")
+        nps_us = _attach_nps_us(sec, holding_contexts, us_names, market_info)
+
     return Context(date=today.isoformat(), profile=settings.profile, market=market_info,
                    holdings=holding_contexts, portfolio=portfolio, glossary_terms=GLOSSARY_TERMS,
-                   nps_changes=nps_changes, nps_annual_as_of=nps_as_of)
+                   nps_changes=nps_changes, nps_annual_as_of=nps_as_of, nps_us=nps_us)

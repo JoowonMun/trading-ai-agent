@@ -134,6 +134,7 @@ class Context(BaseModel):
     portfolio: Portfolio
     nps_changes: list[dict] = []
     nps_annual_as_of: str | None = None
+    nps_us: dict | None = None  # 국민연금 미국 보유 13F 요약
     watchlist: list[dict] = []
     glossary_terms: list[str] = []
     notes: list[str] = []

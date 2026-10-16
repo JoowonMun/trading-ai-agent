@@ -34,6 +34,7 @@ class UsFundamentalData:
     shares: float | None
     dps: float | None
     financial: bool
+    name: str | None = None  # 영문 회사명 (국민연금 13F 매칭용)
 
 
 def _value(df: pd.DataFrame, key: str, column) -> float | None:
@@ -89,7 +90,8 @@ class YahooFundamentals:
 
         return UsFundamentalData(quarters=quarters, points={"PER": per, "PBR": pbr}, shares=shares,
                                  dps=_trailing_dividends(t.dividends, today),
-                                 financial=info.get("sector") == "Financial Services")
+                                 financial=info.get("sector") == "Financial Services",
+                                 name=info.get("longName") or info.get("shortName"))
 
 
 def _trailing_dividends(dividends: pd.Series, today: date) -> float | None:

@@ -56,7 +56,7 @@ jobs:
           mkdir -p out
           if timeout 1500 uv run python -m agent collect --notify-on-error --date "$REPORT_DATE" > out/collect.log 2>&1; then
             echo "수집 완료"
-            grep -E "WARNING|ERROR" out/collect.log | sed -E 's/[0-9]{6,}/<num>/g' | cut -c1-160 || true
+            grep -E "WARNING|ERROR|13F" out/collect.log | sed -E 's/[0-9]{6,}/<num>/g' | cut -c1-160 || true
           else
             echo "수집 실패 또는 25분 초과"
             grep -vE "^\s*$" out/collect.log | tail -n 15 | sed -E 's/[0-9]{6,}/<num>/g' | cut -c1-160; exit 1

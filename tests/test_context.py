@@ -1,7 +1,7 @@
 from datetime import date
 
 import pytest
-from factories import FakeDart, FakeMarket, FakeNps, FakeUs
+from factories import FakeDart, FakeMarket, FakeNps, FakeSec, FakeUs
 
 from agent.config import Account, Holdings, Position, Settings
 from agent.report.context import ContextError, build_context
@@ -127,3 +127,20 @@ def test_nps_failure_is_noted_and_report_continues():
     assert ctx.nps_changes == []
     assert any(m.startswith("국민연금 변동") for m in ctx.market.missing)
     assert by_ticker(ctx)["005930"].signal is not None
+
+
+def test_nps_us_13f_attached():
+    ctx = build_context(Settings(), holdings(), FakeMarket(), FakeDart(TODAY), TODAY, us=FakeUs(TODAY),
+                        sec=FakeSec())
+    apple = by_ticker(ctx)["AAPL"]
+    assert apple.nps == {"us_rank": 1, "us_shares": 2000.0, "us_change_pct": 100.0, "us_new": False,
+                         "us_period": "2026-06-30"}
+    assert ctx.nps_us["period"] == "2026-06-30" and ctx.nps_us["top_buys"][0]["name"] == "APPLE INC"
+    assert "positions" not in ctx.nps_us   # 전체 목록은 context에 넣지 않는다
+
+
+def test_nps_us_failure_noted():
+    ctx = build_context(Settings(), holdings(), FakeMarket(), FakeDart(TODAY), TODAY, us=FakeUs(TODAY),
+                        sec=FakeSec(fail=True))
+    assert ctx.nps_us is None
+    assert any(m.startswith("국민연금 미국 보유") for m in ctx.market.missing)

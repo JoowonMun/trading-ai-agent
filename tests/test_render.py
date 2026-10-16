@@ -94,3 +94,18 @@ def test_holding_with_only_annual_nps_rank_renders():
     ctx.holdings[0].nps = {"annual_rank": 1, "annual_stake_pct": 7.76}
     html = render_report(ctx, None, [])
     assert "국민연금 보유 1위" in html and "국민연금 지분" not in html
+
+
+def test_nps_us_section_and_holding_line():
+    ctx = sample_context()
+    nvda = {"name": "NVIDIA CORPORATION", "shares": 1500.0, "value": 9e9, "rank": 1, "change_pct": 50.0, "new": False}
+    newco = {"name": "NEWCO INC", "shares": 100.0, "value": 5e7, "rank": 40, "change_pct": None, "new": True}
+    ctx.nps_us = {"period": "2026-06-30", "filed": "2026-08-12", "prev_period": "2026-03-31",
+                  "top_holdings": [nvda], "top_buys": [nvda, newco], "top_sells": [],
+                  "sold_out": [{"name": "OLDCO CORP", "prev_shares": 50.0, "prev_value": 4e5}]}
+    ctx.holdings[1].nps = {"us_rank": 3, "us_shares": 2000.0, "us_change_pct": -12.5, "us_new": False,
+                           "us_period": "2026-06-30"}
+    html = render_report(ctx, None, [])
+    assert "국민연금 미국 보유" in html and "2026-06-30" in html
+    assert "NVIDIA CORPORATION" in html and "+50.0%" in html and "신규" in html and "OLDCO CORP" in html
+    assert "국민연금 미국 보유 3위" in html and "-12.5%" in html

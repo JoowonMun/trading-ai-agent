@@ -26,12 +26,14 @@
   5. `review`(재검토) 신호면 "바로 팔라는 뜻이 아니라 처음 산 이유가 유효한지 확인하라는 뜻"임을 꼭 쓴다
 - `indicator_notes`: 이 종목 해설에 쓴 지표 2~4개. `{"term": "PER", "value": "17.5배", "plain": "쉬운 풀이 한 문장"}`
 - 종목의 `nps`(국민연금 지분율·직전 신고 대비 변동·연말 보유 순위)가 있으면 reasoning에 한 문장으로 언급한다. 국민연금이 늘렸다고 오른다는 뜻은 아니므로 "큰손의 동향" 정도로 소개한다.
+- 미국 종목의 `nps`에 `us_rank`가 있으면 국민연금 미국 보유(13F, 분기 말 기준·약 45일 지연) 순위와 전 분기 대비 주식 수 변화를 언급한다. 오래된 데이터임을 함께 밝힌다.
 - `disclosure_notes`: 최근 공시(`disclosures`)가 있으면 무엇인지, 호재·악재 여부를 한두 문장으로. 없으면 빈 문자열.
 
 ## 전체 코멘트
 - `summary`: 1~3줄. 오늘 가장 중요한 것(재검토·추가매수 종목, 리밸런싱 필요 여부, 큰 공시).
 - `market_comment`: `market.indices`와 환율로 시장 분위기 두세 문장. 큰 하락은 장기투자자 관점에서 차분하게.
 - `summary` 또는 `portfolio_comment`에서 `nps_changes` 중 `mine`이 true인 종목(내 보유 종목의 국민연금 지분 변동)을 우선 언급한다.
+- `nps_us`(국민연금 미국 보유 13F 요약)가 있으면 portfolio_comment에서 많이 늘린·줄인 종목 중 내 보유와 겹치는 것을 우선 언급한다.
 - `portfolio_comment`: `portfolio.by_class`의 현재 대 목표 비중, `rebalance` 제안, `warnings`(비중 초과 등)를 쉬운 말로.
 - `watchlist_comment`: 지금은 빈 문자열.
 
