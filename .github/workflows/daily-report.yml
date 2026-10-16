@@ -53,10 +53,12 @@ jobs:
       - name: 데이터 수집·계산 (실패 시 실패 알림 메일)
         run: |
           mkdir -p out
-          if uv run python -m agent collect --notify-on-error --date "$REPORT_DATE" > out/collect.log 2>&1; then
+          if timeout 600 uv run python -m agent collect --notify-on-error --date "$REPORT_DATE" > out/collect.log 2>&1; then
             echo "수집 완료"
+            grep -E "WARNING|ERROR" out/collect.log | sed -E 's/[0-9]{6,}/<num>/g' | cut -c1-160 || true
           else
-            echo "수집 실패 — 실패 알림 메일 발송됨"; tail -n 3 out/collect.log | sed -E 's/[0-9]{6,}/<num>/g'; exit 1
+            echo "수집 실패 또는 10분 초과"
+            grep -vE "^\s*$" out/collect.log | tail -n 15 | sed -E 's/[0-9]{6,}/<num>/g' | cut -c1-160; exit 1
           fi
 
       - name: AI 해설 작성 (Claude Code, 구독 인증)

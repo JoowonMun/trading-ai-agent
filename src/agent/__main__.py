@@ -48,6 +48,7 @@ def resolve_holdings(settings: Settings, manual: Holdings, notes: list[str], nh_
         notes.append(f"나무 잔고 조회 실패 → holdings.yaml 사용 ({type(e).__name__})")
         return manual
     notes.append(f"나무 잔고 자동 조회: {sum(len(a.positions) for a in synced)}종목")
+    log.info("나무 잔고 조회 완료")
     return combine_holdings(manual, synced, cash)
 
 

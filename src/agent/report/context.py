@@ -118,12 +118,14 @@ def _analyze_us(h: HoldingContext, closes: pd.Series, us, settings: Settings, to
 
 def build_context(settings: Settings, holdings: Holdings, market, dart, today: date, us=None) -> Context:
     market_info = _market(market, today)
+    log.info("시장 지표 수집 완료")
     positions = aggregate_positions(holdings)
     start = today - timedelta(days=365 * (settings.band_years + 1))
 
     series: dict[str, pd.Series] = {}
     errors: dict[str, str] = {}
     for p in positions:
+        log.info("시세 조회 %s", p.key)
         try:
             series[p.key] = _fetch_closes(market, p, start, today)
         except Exception as e:
@@ -147,6 +149,7 @@ def build_context(settings: Settings, holdings: Holdings, market, dart, today: d
         h.price = price_snapshot(series[p.key])
         if not p.analyze:
             continue
+        log.info("분석 %s", p.key)
         try:
             if p.market == "US":
                 if us is None:
