@@ -1,8 +1,16 @@
 # trading-ai-agent
 
-주식 초보 개인 투자자를 위한 **일일 투자 리포트 에이전트**.
-매일 아침(평일) 내 증권 계좌 잔고를 읽어 와서, 공시·재무·시세·국민연금 동향으로 종목을 분석하고
+[![tests](https://github.com/JoowonMun/trading-ai-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/JoowonMun/trading-ai-agent/actions/workflows/tests.yml)
+
+주식 초보 개인 투자자를 위한 **AI 투자 리포트 자동화 시스템**.
+평일 아침마다 내 증권 계좌 잔고를 읽어 와서 공시·재무·시세·국민연금 동향으로 종목을 분석하고,
 **근거가 붙은 쉬운 해설**을 메일로 보낸다.
+
+데이터 수집과 모든 계산은 결정적인 파이썬 파이프라인이 맡고, 해설 작성은 **Claude Code 에이전트**가 맡는다.
+에이전트는 계산 결과를 읽어 해설을 쓴 뒤 검증 명령을 직접 실행해 보고, 틀린 숫자가 있으면 스스로 고친다.
+
+<p align="center"><img src="docs/images/sample-report.png" alt="샘플 리포트 (가상의 회사·가짜 숫자)" width="480"></p>
+<p align="center"><sub>샘플 리포트 — 가상의 회사와 가짜 숫자 (<code>uv run python scripts/render_sample.py</code>)</sub></p>
 
 > ⚠️ 개인 학습·참고용 프로젝트입니다. 리포트는 공개 데이터를 정해진 공식으로 계산한 결과이며 투자 권유가 아닙니다.
 
@@ -77,6 +85,12 @@ src/agent/
 prompts/        analysis-guide.md (AI 작성 규칙) · daily-prompt.md
 docs/superpowers/  설계 문서(spec)와 구현 계획(plan)
 ```
+
+## 한계
+
+- 가격 기준은 과거 5년 PER/PBR 밴드와 규칙 기반 신호뿐이며, 신호의 성과를 백테스트로 검증하지는 않았다.
+- 국민연금 국내 지분 변동은 10% 이상 보유 종목의 신고만 잡힌다. 미국 13F는 분기 말 기준으로 약 45일 늦게 공개된다.
+- pykrx·yfinance·13f.info는 비공식 데이터 소스라 구조가 바뀌면 깨질 수 있다(실패 시 해당 항목만 "데이터 누락").
 
 ## 개발 방식
 

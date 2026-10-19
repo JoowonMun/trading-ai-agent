@@ -1,0 +1,21 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: 의존성 설치
+        run: uv sync --frozen --extra dev
+      - name: 단위 테스트 (외부 API 호출 없음)
+        run: uv run pytest -q -p no:warnings
