@@ -62,10 +62,10 @@ jobs:
           DRY=""; [ "${{ inputs.dry_run }}" = "true" ] && DRY="--dry-run"
           if timeout 1500 uv run python -m agent collect --notify-on-error $DRY --date "$REPORT_DATE" > out/collect.log 2>&1; then
             echo "수집 완료"
-            grep -E "WARNING|ERROR|13F" out/collect.log | sed -E 's/[0-9]{6,}/<num>/g' | cut -c1-160 || true
+            grep -E "WARNING|ERROR|13F" out/collect.log | sed -E 's/(KR|US):[A-Za-z0-9.-]+/:<종목>/g; s/[0-9]{6,}/<num>/g' | cut -c1-160 || true
           else
             echo "수집 실패 또는 25분 초과"
-            grep -vE "^\s*$" out/collect.log | tail -n 15 | sed -E 's/[0-9]{6,}/<num>/g' | cut -c1-160; exit 1
+            grep -vE "^\s*$" out/collect.log | tail -n 15 | sed -E 's/(KR|US):[A-Za-z0-9.-]+/:<종목>/g; s/[0-9]{6,}/<num>/g' | cut -c1-160; exit 1
           fi
 
       - name: DART 캐시 저장 (수집이 실패해도 받은 보고서는 다음 실행에서 재사용)
@@ -89,7 +89,7 @@ jobs:
             echo "AI 해설 작성 완료"
           else
             echo "AI 해설 실패 — 숫자 리포트로 발송"
-            head -c 600 out/claude.json | sed -E 's/[0-9]{6,}/<num>/g'; echo; exit 1
+            head -c 600 out/claude.json | sed -E 's/(KR|US):[A-Za-z0-9.-]+/:<종목>/g; s/[0-9]{6,}/<num>/g'; echo; exit 1
           fi
 
       - name: 검증 후 메일 발송
@@ -98,5 +98,5 @@ jobs:
           if uv run python -m agent publish --notify-on-error $DRY --date "$REPORT_DATE" > out/publish.log 2>&1; then
             echo "발송 완료"; grep -oE "AI 해설 상태: .*" out/publish.log || echo "AI 해설 없음"
           else
-            echo "발송 실패"; tail -n 3 out/publish.log | sed -E 's/[0-9]{6,}/<num>/g'; exit 1
+            echo "발송 실패"; tail -n 3 out/publish.log | sed -E 's/(KR|US):[A-Za-z0-9.-]+/:<종목>/g; s/[0-9]{6,}/<num>/g'; exit 1
           fi
