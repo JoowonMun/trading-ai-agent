@@ -1,6 +1,6 @@
 # 매일 자동 발송 설정 (GitHub Actions)
 
-`.github/workflows/daily-report.yml`이 **월~금 07:00(한국시간)** 에 실행된다.
+`.github/workflows/daily-report.yml`이 **월~금 06:17(한국시간)** 에 실행된다. GitHub 예약 실행은 수십 분~2시간 늦어질 수 있다.
 데이터 수집 → Claude Code(구독)가 AI 해설 작성 → 검증 → 메일 발송.
 
 ## 1. Claude 구독 토큰 발급 (1회)

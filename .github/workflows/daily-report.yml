@@ -2,7 +2,7 @@ name: daily-report
 
 on:
   schedule:
-    - cron: "0 22 * * 0-4"   # 월~금 07:00 KST (UTC 전날 22:00)
+    - cron: "17 21 * * 0-4"   # 월~금 06:17 KST (UTC 전날 21:17). GitHub 예약은 정각에 몰려 수십 분~2시간 밀릴 수 있어 일찍·비정각으로
   workflow_dispatch:          # Actions 탭에서 수동 실행
     inputs:
       dry_run:
