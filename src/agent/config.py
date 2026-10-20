@@ -30,6 +30,8 @@ class Settings(BaseModel):
     # 나무 잔고에서 가져온 종목 중 "지수" 자산군으로 분류할 종목코드 (예: IVV, 360750)
     index_tickers: list[str] = []
     alert_move_pct: float = 5.0  # 직전 기록 대비 이만큼(%) 움직이면 알림
+    research_weekly_move_pct: float = 7.0  # 주간 리포트에서 이만큼(%) 움직인 종목은 원인 조사
+    research_max: int = 3  # 하루 원인 조사 종목 수 상한
 
     @model_validator(mode="after")
     def _allocation_sums_to_100(self):

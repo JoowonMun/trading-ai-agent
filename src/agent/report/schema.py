@@ -177,8 +177,15 @@ class Context(BaseModel):
     glossary_terms: list[str] = []
     notes: list[str] = []
     report_type: ReportType = "weekly"  # weekly=전체 리포트, alert=알림 메일, none=보내지 않음
+    research_targets: list[str] = []  # AI가 '왜 움직였나'를 조사할 티커 (코드가 정함)
     alerts: list[Alert] = []
     weekly: WeeklyDiff | None = None
+
+
+class MoveReason(BaseModel):
+    found: bool
+    summary: str
+    sources: list[str] = []
 
 
 class IndicatorNote(BaseModel):
@@ -205,3 +212,4 @@ class Analysis(BaseModel):
     portfolio_comment: str = ""
     watchlist_comment: str = ""
     alert_comments: dict[str, str] = {}  # 알림 메일: 티커 → 한두 문장 해설
+    move_reasons: dict[str, "MoveReason"] = {}  # 티커 → AI가 웹에서 찾은 변동 원인
