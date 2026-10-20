@@ -22,6 +22,7 @@ def test_apply_history_alert_day(tmp_path):
     ctx = sample_context()                                   # 2026-10-15 (목)
     cli.apply_history(ctx, Settings(), seeded_store(tmp_path, close=70000), date(2026, 10, 15))
     assert ctx.report_type == "alert" and [a.kind for a in ctx.alerts] == ["big_move"]
+    assert ctx.research_targets == ["005930"]
 
 
 def test_apply_history_quiet_day(tmp_path):
@@ -42,8 +43,9 @@ def test_apply_history_store_error_treated_as_first_run(tmp_path):
             raise OSError("checkout failed")
 
     ctx = sample_context()
+    ctx.research_targets = ["stale"]
     cli.apply_history(ctx, Settings(), Broken(), date(2026, 10, 15))
-    assert ctx.report_type == "none"
+    assert ctx.report_type == "none" and ctx.research_targets == []
 
 
 def setup_dirs(tmp_path, report_type):

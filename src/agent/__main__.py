@@ -11,6 +11,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from agent.analysis.alerts import detect_alerts
+from agent.analysis.research import pick_research_targets
 from agent.analysis.weekly import decide_report_type, weekly_diff
 from agent.collectors.dart import DartClient
 from agent.collectors.nh import NhClient
@@ -74,9 +75,10 @@ def apply_history(context: Context, settings: Settings, store, today: date) -> N
                 week_alerts = [Alert(**a) for s in store.between(start, today - timedelta(days=1))
                                for a in s.get("alerts", [])] + context.alerts
                 context.weekly = weekly_diff(week_prev, context, week_alerts)
+        context.research_targets = pick_research_targets(context, settings)
     except Exception as e:
         log.warning("기록 저장소 읽기 실패 — 첫 실행처럼 진행: %s", type(e).__name__)
-        context.alerts, context.weekly = [], None
+        context.alerts, context.weekly, context.research_targets = [], None, []
         context.report_type = decide_report_type(today, None, [])
     log.info("메일 종류: %s (알림 %d건)", context.report_type, len(context.alerts))
 
