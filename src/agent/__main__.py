@@ -25,7 +25,7 @@ from agent.history.snapshot import make_snapshot
 from agent.history.store import SnapshotStore
 from agent.report.context import build_context
 from agent.report.render import render_report
-from agent.report.schema import Alert, Context
+from agent.report.schema import Alert, Context, MoveReason
 from agent.report.validate import check_move_reasons, validate_analysis
 
 log = logging.getLogger("agent")
@@ -115,6 +115,11 @@ def cmd_publish(args) -> Path:
     analysis_path = day / "analysis.json"
     if analysis_path.exists():
         analysis, errors = validate_analysis(json.loads(analysis_path.read_text(encoding="utf-8")), context)
+        if analysis is not None:
+            # 원인 조사는 웹 도구만 가진 별도 AI가 research.json으로 낸다 — 해설 AI가 쓴 move_reasons는 쓰지 않는다
+            research_path = day / "research.json"
+            research = json.loads(research_path.read_text(encoding="utf-8")) if research_path.exists() else {}
+            analysis.move_reasons = {t: MoveReason.model_validate(r) for t, r in research.items()}
         if errors:
             notes.append("AI 분석 검증 실패 → 숫자 리포트로 대체")
             notes.extend(errors[:5])
@@ -160,6 +165,40 @@ def cmd_check(args) -> None:
     print("검증 통과")
 
 
+def cmd_research_prompt(args) -> None:
+    """원인 조사 담당 AI(웹 도구만 가진 별도 실행)에게 줄 지시문을 출력한다."""
+    context = Context.model_validate_json((_day_dir(args) / "context.json").read_text(encoding="utf-8"))
+    guide = Path("prompts/research-guide.md").read_text(encoding="utf-8")
+    by_ticker = {h.ticker: h for h in context.holdings}
+    weekly = {w.ticker: w for w in (context.weekly.holdings if context.weekly else [])}
+    lines = []
+    for t in context.research_targets:
+        h = by_ticker.get(t)
+        moves = [a.message for a in context.alerts if a.ticker == t and a.kind == "big_move"]
+        if not moves and t in weekly and weekly[t].return_pct is not None:
+            moves = [f"지난주 대비 {weekly[t].return_pct:+.1f}%"]
+        market = "미국" if h and h.market == "US" else "국내"
+        lines.append(f"- {t} ({h.name if h else t}, {market} 주식): {', '.join(moves)}")
+    print(f"{guide}\n\n## 조사할 종목 (기준일 {context.date})\n" + "\n".join(lines))
+
+
+def cmd_research_save(args) -> None:
+    """조사 담당 AI의 답변(JSON)에서 조사 대상 종목의 결과만 골라 research.json으로 저장한다."""
+    day = _day_dir(args)
+    context = Context.model_validate_json((day / "context.json").read_text(encoding="utf-8"))
+    result = json.loads((day / "research_raw.json").read_text(encoding="utf-8")).get("result") or ""
+    start, end = result.find("{"), result.rfind("}")
+    try:
+        raw = json.loads(result[start:end + 1]) if start != -1 else {}
+        reasons = {t: MoveReason.model_validate(raw[t]).model_dump() for t in context.research_targets if t in raw}
+    except (ValueError, TypeError) as e:
+        log.warning("원인 조사 결과 해석 실패: %s", type(e).__name__)
+        return
+    if reasons:
+        (day / "research.json").write_text(json.dumps(reasons, ensure_ascii=False), encoding="utf-8")
+    log.info("원인 조사 결과: %d종목", len(reasons))
+
+
 def cmd_save_snapshot(args) -> None:
     """발송이 끝난 뒤 오늘 스냅샷을 기록 저장소 폴더에 쓴다 (커밋·푸시는 워크플로가 한다)."""
     if not args.history_dir:
@@ -196,7 +235,7 @@ def main(argv: list[str] | None = None) -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     parser = argparse.ArgumentParser(prog="python -m agent")
-    parser.add_argument("command", choices=["collect", "check", "publish", "run", "save-snapshot"])
+    parser.add_argument("command", choices=["collect", "check", "publish", "run", "save-snapshot", "research-prompt", "research-save"])
     parser.add_argument("--date", type=date.fromisoformat, default=None, help="기준일 (기본: 오늘, 한국시간)")
     parser.add_argument("--out", type=Path, default=Path("out"))
     parser.add_argument("--config-dir", type=Path, default=Path("config"))
@@ -208,7 +247,8 @@ def main(argv: list[str] | None = None) -> None:
     args.date = args.date or today_kst()
 
     commands = {"collect": cmd_collect, "check": cmd_check, "publish": cmd_publish, "run": cmd_run,
-                "save-snapshot": cmd_save_snapshot}
+                "save-snapshot": cmd_save_snapshot, "research-prompt": cmd_research_prompt,
+                "research-save": cmd_research_save}
     step = commands[args.command]
     if args.notify_on_error and args.command in ("collect", "publish"):
         step = _notify_on_error(step)

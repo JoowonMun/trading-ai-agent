@@ -59,3 +59,14 @@
 - publish: 조사 결과만 실패하면 나머지 해설은 유지
 - 렌더: 요약·출처 링크 표시
 - 워크플로: allowedTools에 WebSearch
+
+## 9. 보안 구조 변경 (2026-10-20, 코드 리뷰 Critical 반영)
+
+웹페이지는 신뢰할 수 없는 입력이다. 처음 구현은 해설 AI 하나에 WebSearch·WebFetch와 Write·Edit·Bash(check)를 함께 주고 job 전체에 모든 비밀값을 넣어,
+악성 페이지의 숨은 지시가 비밀값·보유 내역을 빼내거나 코드를 바꿀 수 있는 구조였다. 그래서:
+
+- **조사 담당 AI를 분리**: `research-prompt`가 대상 종목과 `prompts/research-guide.md`로 지시문을 만들고, Claude Code를 `--tools "WebSearch,WebFetch"`(파일·명령 없음)로 실행해 JSON을 답변으로만 받는다. `research-save`가 대상 종목만 골라 스키마 검증 후 `research.json`에 저장.
+- **해설 AI는 웹 도구 없음**(`--tools "Read,Write,Edit,Bash"`, Bash는 check 명령만). `publish`는 해설 AI가 쓴 `move_reasons`를 무시하고 `research.json`만 쓴다.
+- **비밀값은 단계별**: 수집(DART·나무·KRX·메일), 발송(메일)에만. 두 AI 단계는 Claude 토큰만.
+- AI 단계마다 `timeout 600`. 실패 로그는 상태값만(내용 출력 금지).
+- 출처 링크 표시는 `hostname` 기준(`user@host` 위장 방지).

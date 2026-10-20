@@ -46,6 +46,7 @@ LLM이 코딩하며 흔히 저지르는 실수를 줄이기 위한 원칙. 속�
 - Actions 로그는 공개다. 출력은 성공/실패·개수만, 종목은 `(KR|US):<종목>`, 6자리 이상 숫자는 `<num>`으로 가린다. 보유 내역이 담긴 출력은 파일로만.
 - 키는 `.env`(로컬)·GitHub Secrets(Actions)만. `config/holdings.yaml`, `out/`, `.cache/`, `data/`는 git 제외.
 - 기록(스냅샷)은 비공개 저장소 `JoowonMun/trading-ai-agent-data`에만. 주문 API는 호출하지 않는다(`collectors/nh.py`의 `ALLOWED_PATHS`).
+- **웹을 읽는 AI와 파일·명령을 다루는 AI를 섞지 않는다(프롬프트 인젝션 방어).** 원인 조사 AI는 `--tools "WebSearch,WebFetch"`만, 해설 AI는 웹 도구 없음. 비밀값은 job 전체가 아니라 필요한 단계에만, AI 단계엔 Claude 토큰만. 웹에서 온 결과는 코드가 검증한 뒤에만 리포트에 들어간다.
 
 ### 사용자에게 보이는 글
 - 리포트·메일·알림 문구는 한국어 해요체, 초보자 기준으로 쉽게.
@@ -67,11 +68,11 @@ gh workflow run daily-report.yml -f dry_run=true   # Actions 점검 실행
 ```
 src/agent/collectors/  dart · nh(잔고, 조회 전용) · prices · us_fundamentals · nps · sec13f(13f.info)
 src/agent/analysis/    financials · fundamentals · valuation · signals · assessment · portfolio
-                       · disclosures · indicators · alerts · weekly
+                       · disclosures · indicators · alerts · weekly · research
 src/agent/history/     snapshot · store (비공개 기록 저장소)
 src/agent/report/      context(오케스트레이션) · schema · validate · render · templates/{email,alert}.html · glossary
 src/agent/__main__.py  CLI
-prompts/               analysis-guide.md(AI 작성 규칙) · daily-prompt.md
+prompts/               analysis-guide.md(해설 AI 규칙) · daily-prompt.md · research-guide.md(원인 조사 AI 규칙)
 .github/workflows/     daily-report.yml(평일 06:17 KST) · tests.yml(CI)
 ```
 

@@ -167,3 +167,14 @@ def test_move_reason_in_weekly_report_and_not_found():
         move_reasons={"005930": {"found": False, "summary": "뚜렷한 원인을 찾지 못했어요."}})
     html = render_report(ctx, a, [])
     assert "왜 움직였나" in html and "뚜렷한 원인을 찾지 못했어요" in html
+
+
+def test_source_link_shows_real_host_not_userinfo():
+    from agent.report.schema import Alert
+    ctx = sample_context()
+    ctx.report_type = "alert"
+    ctx.alerts = [Alert(kind="big_move", ticker="005930", name="삼성전자", market="KR", message="m")]
+    a = Analysis(date="2026-10-15", summary=["x"], move_reasons={"005930": {
+        "found": True, "summary": "s", "sources": ["https://www.yna.co.kr@evil.example/x"]}})
+    html = render_report(ctx, a, [])
+    assert ">evil.example<" in html and ">www.yna.co.kr@evil.example<" not in html

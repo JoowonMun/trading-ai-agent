@@ -37,7 +37,8 @@ def _signed_pct(value):
 _env = Environment(loader=FileSystemLoader(Path(__file__).parent / "templates"),
                    autoescape=select_autoescape(["html"]))
 def _domain(url: str) -> str:
-    return urlparse(url).netloc or url
+    # netloc은 'www.yna.co.kr@evil.example' 같은 사용자 정보까지 포함해 믿을 만한 도메인처럼 보일 수 있다
+    return urlparse(url).hostname or url
 
 
 _env.filters.update(num=_num, money=_money, signed_pct=_signed_pct, domain=_domain)

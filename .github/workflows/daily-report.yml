@@ -17,20 +17,12 @@ concurrency:
 permissions:
   contents: read
 
+# 비밀값은 job 전체가 아니라 필요한 단계에만 준다 — 웹을 읽는 AI 단계가 다른 키에 닿지 못하게
 jobs:
   report:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      DART_API_KEY: ${{ secrets.DART_API_KEY }}
-      NH_APP_KEY: ${{ secrets.NH_APP_KEY }}
-      NH_APP_SECRET: ${{ secrets.NH_APP_SECRET }}
-      KRX_ID: ${{ secrets.KRX_ID }}
-      KRX_PW: ${{ secrets.KRX_PW }}
-      SMTP_USER: ${{ secrets.SMTP_USER }}
-      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-      MAIL_FROM: ${{ secrets.MAIL_FROM }}
-      MAIL_TO: ${{ secrets.MAIL_TO }}
       PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@v4
@@ -63,16 +55,29 @@ jobs:
           key: dart-${{ github.run_id }}
           restore-keys: dart-
 
-      # 로그는 저장소를 공개하면 누구나 볼 수 있으므로, 보유 내역이 담긴 출력은 파일로만 남긴다
+      # 로그는 공개다 — 보유 내역이 담긴 출력은 파일로만 남기고 화면에는 성공/실패·개수만
       - name: 데이터 수집·계산 (실패 시 실패 알림 메일)
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          NH_APP_KEY: ${{ secrets.NH_APP_KEY }}
+          NH_APP_SECRET: ${{ secrets.NH_APP_SECRET }}
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
         run: |
           mkdir -p out
           DRY=""; [ "${{ inputs.dry_run }}" = "true" ] && DRY="--dry-run"
           if timeout 1500 uv run python -m agent collect --notify-on-error $DRY --history-dir data --date "$REPORT_DATE" > out/collect.log 2>&1; then
             echo "수집 완료"
-            REPORT_TYPE=$(uv run python -c "import json; print(json.load(open('out/$REPORT_DATE/context.json', encoding='utf-8'))['report_type'])")
+            CTX="out/$REPORT_DATE/context.json"
+            REPORT_TYPE=$(uv run python -c "import json; print(json.load(open('$CTX', encoding='utf-8'))['report_type'])")
+            RESEARCH_COUNT=$(uv run python -c "import json; print(len(json.load(open('$CTX', encoding='utf-8'))['research_targets']))")
             echo "REPORT_TYPE=$REPORT_TYPE" >> "$GITHUB_ENV"
-            echo "메일 종류: $REPORT_TYPE"
+            echo "RESEARCH_COUNT=$RESEARCH_COUNT" >> "$GITHUB_ENV"
+            echo "메일 종류: $REPORT_TYPE · 원인 조사 대상 ${RESEARCH_COUNT}종목"
             grep -E "WARNING|ERROR|13F" out/collect.log | sed -E 's/(KR|US):[A-Za-z0-9.-]+/\1:<종목>/g; s/[0-9]{6,}/<num>/g' | cut -c1-160 || true
           else
             echo "수집 실패 또는 25분 초과"
@@ -86,6 +91,26 @@ jobs:
           path: .cache/dart
           key: dart-${{ github.run_id }}
 
+      # 웹을 읽는 조사 담당 AI: 도구는 WebSearch·WebFetch뿐(파일·명령 없음), 비밀값은 Claude 토큰뿐
+      - name: 원인 조사 (웹 검색 전용 AI)
+        if: env.REPORT_TYPE != 'none' && env.RESEARCH_COUNT != '0'
+        continue-on-error: true   # 실패해도 조사 없이 발송
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          PROMPT="$(uv run python -m agent research-prompt --date "$REPORT_DATE" 2>/dev/null)"
+          if timeout 600 npx -y @anthropic-ai/claude-code@2.1.301 -p "$PROMPT" \
+              --model claude-opus-5-5 \
+              --tools "WebSearch,WebFetch" \
+              --allowedTools "WebSearch" "WebFetch" \
+              --output-format json < /dev/null > "out/$REPORT_DATE/research_raw.json" 2> out/research.err; then
+            uv run python -m agent research-save --date "$REPORT_DATE" > out/research.log 2>&1
+            echo "원인 조사 완료"; grep -oE "원인 조사 결과: [0-9]+종목" out/research.log || true
+          else
+            echo "원인 조사 실패 또는 10분 초과 — 조사 없이 발송"; exit 1
+          fi
+
+      # 해설 담당 AI: 파일 읽기·쓰기와 검증 명령만, 웹 도구 없음
       - name: AI 해설 작성 (Claude Code, 구독 인증)
         if: env.REPORT_TYPE != 'none'   # 메일을 안 보내는 날은 건너뛴다
         continue-on-error: true   # 실패해도 숫자 리포트는 발송
@@ -93,18 +118,24 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           PROMPT="$(sed "s/{{DATE}}/$REPORT_DATE/g" prompts/daily-prompt.md)"
-          if npx -y @anthropic-ai/claude-code@2.1.301 -p "$PROMPT" \
+          if timeout 600 npx -y @anthropic-ai/claude-code@2.1.301 -p "$PROMPT" \
               --model claude-opus-5-5 \
               --permission-mode acceptEdits \
-              --allowedTools "Read" "Write" "Edit" "Bash(uv run python -m agent check:*)" "WebSearch" "WebFetch" \
+              --tools "Read,Write,Edit,Bash" \
+              --allowedTools "Read" "Write" "Edit" "Bash(uv run python -m agent check:*)" \
               --output-format json < /dev/null > out/claude.json 2>&1; then
             echo "AI 해설 작성 완료"
           else
-            echo "AI 해설 실패 — 숫자 리포트로 발송"
-            head -c 600 out/claude.json | sed -E 's/(KR|US):[A-Za-z0-9.-]+/\1:<종목>/g; s/[0-9]{6,}/<num>/g'; echo; exit 1
+            STATUS=$(uv run python -c "import json; d=json.load(open('out/claude.json', encoding='utf-8')); print(d.get('subtype'), d.get('is_error'))" 2>/dev/null || echo "알 수 없음")
+            echo "AI 해설 실패 또는 10분 초과 — 숫자 리포트로 발송 ($STATUS)"; exit 1
           fi
 
       - name: 검증 후 메일 발송
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
         run: |
           DRY=""; [ "${{ inputs.dry_run }}" = "true" ] && DRY="--dry-run"
           if uv run python -m agent publish --notify-on-error $DRY --date "$REPORT_DATE" > out/publish.log 2>&1; then

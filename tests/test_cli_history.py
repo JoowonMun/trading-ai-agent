@@ -110,8 +110,9 @@ def test_publish_drops_only_invalid_move_reasons(tmp_path, monkeypatch):
     (day / "analysis.json").write_text(json.dumps({
         "date": "2026-10-15", "summary": ["삼성전자 하락"],
         "alert_comments": {"005930": "차분하게 지켜볼 때예요."},
-        "move_reasons": {"005930": {"found": True, "summary": "영업이익이 30% 줄었다는 보도", "sources": ["https://x.com/a"]}},
     }), encoding="utf-8")
+    (day / "research.json").write_text(json.dumps({"005930": {
+        "found": True, "summary": "영업이익이 30% 줄었다는 보도", "sources": ["https://x.com/a"]}}), encoding="utf-8")
     monkeypatch.setattr(cli, "send_email", lambda *a: None)
     cli.main(publish_args(tmp_path, config, "publish"))
     html = (day / "preview.html").read_text(encoding="utf-8")
