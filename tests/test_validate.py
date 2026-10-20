@@ -80,3 +80,28 @@ def test_profile_numbers_only_allowed_as_percent():
 def test_numbers_without_unit_are_ignored():
     _, errors = validate_analysis(analysis(reasoning="2026년 들어 5일 연속 상승"), sample_context())
     assert errors == []
+
+
+def alert_context():
+    from agent.report.schema import Alert
+    ctx = sample_context()
+    ctx.report_type = "alert"
+    ctx.alerts = [Alert(kind="big_move", ticker="005930", name="삼성전자", market="KR",
+                        message="삼성전자 -6.2% (2026-10-14 대비, 69,300원 → 65,000원)", important=True)]
+    return ctx
+
+
+def test_alert_mode_allows_empty_holdings_and_checks_comments():
+    raw = {"date": "2026-10-15", "summary": ["삼성전자가 크게 내렸어요"],
+           "alert_comments": {"005930": "하루에 -6.2% 내려 69,300원에서 65,000원이 됐어요."}}
+    assert validate_analysis(raw, alert_context())[1] == []          # 알림 문구 숫자 허용
+
+
+def test_alert_comment_fabricated_number_rejected():
+    raw = {"date": "2026-10-15", "summary": ["x"], "alert_comments": {"005930": "목표가 99,000원"}}
+    assert any("99,000원" in e for e in validate_analysis(raw, alert_context())[1])
+
+
+def test_alert_comment_for_unknown_ticker_rejected():
+    raw = {"date": "2026-10-15", "summary": ["x"], "alert_comments": {"ZZZZ": "설명"}}
+    assert any("ZZZZ" in e for e in validate_analysis(raw, alert_context())[1])

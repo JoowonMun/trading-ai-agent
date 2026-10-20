@@ -50,6 +50,10 @@ def _holding_texts(h) -> list[str]:
     return texts
 
 
+def _text_numbers(text: str) -> list[float]:
+    return [float(n.replace(",", "")) for n in re.findall(r"-?\d[\d,]*(?:\.\d+)?", text)]
+
+
 def validate_analysis(raw: dict, context: Context) -> tuple[Analysis | None, list[str]]:
     try:
         analysis = Analysis.model_validate(raw)
@@ -59,7 +63,8 @@ def validate_analysis(raw: dict, context: Context) -> tuple[Analysis | None, lis
     errors = []
     expected = {h.ticker: h.signal for h in context.holdings if h.signal}
     got = {h.ticker: h for h in analysis.holdings}
-    if set(got) != set(expected):
+    alert_mode_without_holdings = context.report_type == "alert" and not analysis.holdings
+    if set(got) != set(expected) and not alert_mode_without_holdings:
         errors.append(f"종목 불일치: 기대 {sorted(expected)} / 실제 {sorted(got)}")
 
     for ticker, h in got.items():
@@ -76,11 +81,20 @@ def validate_analysis(raw: dict, context: Context) -> tuple[Analysis | None, lis
     per_holding = {h.ticker: _numbers(h.model_dump()) for h in context.holdings}
     percent_only = _numbers(context.profile.model_dump())
 
+    # 알림 문구(코드가 만든 문장) 속 숫자도 근거로 인정한다
+    alert_numbers = [n for a in context.alerts for n in _text_numbers(a.message)]
+    alert_tickers = {a.ticker for a in context.alerts}
+
     general = [*analysis.summary, analysis.market_comment, analysis.portfolio_comment, analysis.watchlist_comment]
-    everything = shared + [n for nums in per_holding.values() for n in nums]
+    everything = shared + [n for nums in per_holding.values() for n in nums] + alert_numbers
     checks = [(text, everything) for text in general]
     for h in analysis.holdings:
         checks += [(text, shared + per_holding.get(h.ticker, [])) for text in _holding_texts(h)]
+    for ticker, comment in analysis.alert_comments.items():
+        if ticker not in alert_tickers:
+            errors.append(f"알림에 없는 종목 해설: {ticker}")
+            continue
+        checks.append((comment, shared + per_holding.get(ticker, []) + alert_numbers))
     for text, allowed in checks:
         errors += [f"근거 없는 숫자: {bad}" for bad in _unsupported(text, allowed, percent_only)]
 
