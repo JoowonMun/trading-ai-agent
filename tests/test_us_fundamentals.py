@@ -34,6 +34,7 @@ class FakeTicker:
         self.balance_sheet = frame({"Stockholders Equity": [180, 150, 120, 100, 90]}, A_ENDS)
         idx = pd.to_datetime(["2025-06-01", "2026-03-01", "2026-09-01"]).tz_localize("America/New_York")
         self.dividends = dividends if dividends is not None else pd.Series([0.5, 0.01, 0.01], index=idx)
+        self.calendar = {}
 
 
 def load(ticker=None):
@@ -86,6 +87,14 @@ def test_missing_values_become_none():
 def test_no_financial_statements_raises():
     with pytest.raises(RuntimeError, match="재무"):
         load(FakeTicker(quarterly_income=pd.DataFrame()))
+
+
+def test_next_earnings_from_calendar():
+    t = FakeTicker()
+    t.calendar = {"Earnings Date": [date(2026, 10, 20), date(2026, 10, 24)]}
+    assert load(t).next_earnings == "2026-10-20"
+    t.calendar = {"Earnings Date": [date(2026, 7, 1)]}      # 지난 날짜만 있으면 없음
+    assert load(t).next_earnings is None
 
 
 @pytest.mark.live

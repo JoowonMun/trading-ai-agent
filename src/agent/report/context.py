@@ -112,6 +112,7 @@ def _signal(h: HoldingContext, settings: Settings) -> None:
 def _analyze_us(h: HoldingContext, closes: pd.Series, us, settings: Settings, today: date) -> str | None:
     """분석하고 영문 회사명(13F 매칭용)을 돌려준다."""
     data = us.load(h.ticker, today)
+    h.next_earnings = data.next_earnings
     if not data.quarters or not data.shares:
         raise RuntimeError("재무제표 또는 발행주식수를 찾지 못했습니다")
     _value(h, closes, data.quarters, data.points, data.shares, data.dps, data.financial, settings, decimals=2)

@@ -35,6 +35,7 @@ class UsFundamentalData:
     dps: float | None
     financial: bool
     name: str | None = None  # 영문 회사명 (국민연금 13F 매칭용)
+    next_earnings: str | None = None  # 다음 실적 발표일 (YYYY-MM-DD)
 
 
 def _value(df: pd.DataFrame, key: str, column) -> float | None:
@@ -91,7 +92,18 @@ class YahooFundamentals:
         return UsFundamentalData(quarters=quarters, points={"PER": per, "PBR": pbr}, shares=shares,
                                  dps=_trailing_dividends(t.dividends, today),
                                  financial=info.get("sector") == "Financial Services",
-                                 name=info.get("longName") or info.get("shortName"))
+                                 name=info.get("longName") or info.get("shortName"),
+                                 next_earnings=_next_earnings(t, today))
+
+
+def _next_earnings(ticker, today: date) -> str | None:
+    """yfinance 실적 일정에서 오늘 이후 가장 가까운 발표일. 일정은 선택 정보라 실패해도 None."""
+    try:
+        dates = (ticker.calendar or {}).get("Earnings Date") or []
+        upcoming = sorted(d for d in dates if d >= today)
+        return upcoming[0].isoformat() if upcoming else None
+    except Exception:
+        return None
 
 
 def _trailing_dividends(dividends: pd.Series, today: date) -> float | None:

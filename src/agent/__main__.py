@@ -4,12 +4,14 @@ import json
 import logging
 import os
 import sys
-from datetime import date
+from datetime import date, timedelta
 from html import escape
 from pathlib import Path
 
 from dotenv import load_dotenv
 
+from agent.analysis.alerts import detect_alerts
+from agent.analysis.weekly import decide_report_type, weekly_diff
 from agent.collectors.dart import DartClient
 from agent.collectors.nh import NhClient
 from agent.collectors.nps import NpsClient
@@ -18,9 +20,11 @@ from agent.collectors.sec13f import Nps13fClient
 from agent.collectors.us_fundamentals import YahooFundamentals
 from agent.config import Holdings, Settings, combine_holdings, load_holdings, load_settings, today_kst
 from agent.delivery.email import send_email
+from agent.history.snapshot import make_snapshot
+from agent.history.store import SnapshotStore
 from agent.report.context import build_context
 from agent.report.render import render_report
-from agent.report.schema import Context
+from agent.report.schema import Alert, Context
 from agent.report.validate import validate_analysis
 
 log = logging.getLogger("agent")
@@ -54,6 +58,25 @@ def resolve_holdings(settings: Settings, manual: Holdings, notes: list[str], nh_
     return combine_holdings(manual, synced, cash)
 
 
+def apply_history(context: Context, settings: Settings, store, today: date) -> None:
+    """직전 스냅샷과 비교해 알림·메일 종류·주간 비교를 채운다. 저장소 오류는 첫 실행처럼 처리한다."""
+    try:
+        prev = store.latest_before(today)
+    except Exception as e:
+        log.warning("기록 저장소 읽기 실패: %s", type(e).__name__)
+        store, prev = None, None
+    context.alerts = detect_alerts(prev, context, settings)
+    context.report_type = decide_report_type(today, prev, context.alerts)
+    if context.report_type == "weekly" and store is not None:
+        week_prev = store.on_or_before(today - timedelta(days=7)) or prev
+        if week_prev is not None:
+            start = date.fromisoformat(week_prev["date"]) + timedelta(days=1)
+            week_alerts = [Alert(**a) for s in store.between(start, today - timedelta(days=1))
+                           for a in s.get("alerts", [])] + context.alerts
+            context.weekly = weekly_diff(week_prev, context, week_alerts)
+    log.info("메일 종류: %s (알림 %d건)", context.report_type, len(context.alerts))
+
+
 def cmd_collect(args) -> Path:
     settings = load_settings(args.config_dir / "settings.yaml")
     notes: list[str] = []
@@ -64,6 +87,8 @@ def cmd_collect(args) -> Path:
     context = build_context(settings, holdings, MarketData(), dart, args.date, us=YahooFundamentals(), nps=nps,
                             sec=sec)
     context.notes = notes
+    if args.history_dir:
+        apply_history(context, settings, SnapshotStore(args.history_dir), args.date)
     day = _day_dir(args)
     day.mkdir(parents=True, exist_ok=True)
     path = day / "context.json"
@@ -76,6 +101,9 @@ def cmd_publish(args) -> Path:
     settings = load_settings(args.config_dir / "settings.yaml")
     day = _day_dir(args)
     context = Context.model_validate_json((day / "context.json").read_text(encoding="utf-8"))
+    if context.report_type == "none":
+        log.info("변화 없음 — 메일 생략")
+        return None
 
     notes, analysis = [], None
     analysis_path = day / "analysis.json"
@@ -93,7 +121,9 @@ def cmd_publish(args) -> Path:
     preview.write_text(html, encoding="utf-8")
     log.info("미리보기 저장: %s", preview)
     if not args.dry_run:
-        send_email(f"{settings.report_subject_prefix} {context.date}", html)
+        subject = (f"[투자 알림] {context.date}" if context.report_type == "alert"
+                   else f"{settings.report_subject_prefix} {context.date}")
+        send_email(subject, html)
         log.info("메일 발송 완료")
     return preview
 
@@ -116,6 +146,15 @@ def cmd_check(args) -> None:
             print(f"- {e}")
         sys.exit(1)
     print("검증 통과")
+
+
+def cmd_save_snapshot(args) -> None:
+    """발송이 끝난 뒤 오늘 스냅샷을 기록 저장소 폴더에 쓴다 (커밋·푸시는 워크플로가 한다)."""
+    if not args.history_dir:
+        raise SystemExit("--history-dir가 필요합니다")
+    context = Context.model_validate_json((_day_dir(args) / "context.json").read_text(encoding="utf-8"))
+    SnapshotStore(args.history_dir).save(make_snapshot(context))
+    log.info("스냅샷 저장: %s", context.date)
 
 
 def _notify_on_error(step):
@@ -145,16 +184,19 @@ def main(argv: list[str] | None = None) -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     parser = argparse.ArgumentParser(prog="python -m agent")
-    parser.add_argument("command", choices=["collect", "check", "publish", "run"])
+    parser.add_argument("command", choices=["collect", "check", "publish", "run", "save-snapshot"])
     parser.add_argument("--date", type=date.fromisoformat, default=None, help="기준일 (기본: 오늘, 한국시간)")
     parser.add_argument("--out", type=Path, default=Path("out"))
     parser.add_argument("--config-dir", type=Path, default=Path("config"))
     parser.add_argument("--dry-run", action="store_true", help="메일을 보내지 않고 preview.html만 생성")
     parser.add_argument("--notify-on-error", action="store_true", help="collect·publish 실패 시 실패 알림 메일 발송")
+    parser.add_argument("--history-dir", type=Path, default=None,
+                        help="기록 저장소 폴더 (주면 직전 스냅샷과 비교해 알림·주간 리포트를 만든다)")
     args = parser.parse_args(argv)
     args.date = args.date or today_kst()
 
-    commands = {"collect": cmd_collect, "check": cmd_check, "publish": cmd_publish, "run": cmd_run}
+    commands = {"collect": cmd_collect, "check": cmd_check, "publish": cmd_publish, "run": cmd_run,
+                "save-snapshot": cmd_save_snapshot}
     step = commands[args.command]
     if args.notify_on_error and args.command in ("collect", "publish"):
         step = _notify_on_error(step)
