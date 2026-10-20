@@ -58,3 +58,10 @@ def test_missing_fx_excludes_us_with_fx_reason():
     assert "US:B" not in p.weights
     assert any("비: 환율 없음" in w for w in p.warnings)
     assert p.rebalance == []
+
+
+def test_nan_price_is_treated_as_missing():
+    p = run({"KR:A": 6000, "US:B": float("nan"), "KR:C": 20000})
+    assert "US:B" not in p.weights
+    assert all(w == w for w in p.weights.values())  # NaN 없음
+    assert any("비: 시세 없음" in w for w in p.warnings)

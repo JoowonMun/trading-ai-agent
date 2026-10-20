@@ -53,3 +53,21 @@ def test_pykrx_login_messages_are_not_printed(monkeypatch, capsys):
     assert MarketData().kr_flows("005930", date(2026, 10, 15)) == {"foreign_5d_krw": 5.0, "institution_5d_krw": 10.0}
     out = capsys.readouterr()
     assert "secret-id" not in out.out + out.err
+
+
+def test_us_closes_drop_missing_values(monkeypatch):
+    import numpy as np
+    import pandas as pd
+    import yfinance as yf
+
+    class FakeTicker:
+        def __init__(self, symbol):
+            pass
+
+        def history(self, **kwargs):
+            idx = pd.date_range("2026-10-14", periods=3, tz="America/New_York")
+            return pd.DataFrame({"Close": [100.0, 101.0, np.nan]}, index=idx)
+
+    monkeypatch.setattr(yf, "Ticker", FakeTicker)
+    closes = MarketData().us_closes("AAPL", date(2026, 10, 14), date(2026, 10, 16))
+    assert closes.tolist() == [100.0, 101.0]

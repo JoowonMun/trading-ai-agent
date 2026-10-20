@@ -26,7 +26,7 @@ class MarketData:
         df = _quiet(stock.get_market_ohlcv, _yyyymmdd(start), _yyyymmdd(end), ticker)
         if df is None or df.empty or "종가" not in df.columns:
             raise RuntimeError(f"{ticker} 국내 시세를 가져오지 못했습니다")
-        closes = df["종가"].astype(float)
+        closes = df["종가"].astype(float).dropna()
         return closes[closes > 0]
 
     def us_closes(self, ticker: str, start: date, end: date) -> pd.Series:
@@ -36,7 +36,9 @@ class MarketData:
                                        auto_adjust=True)
         if df is None or df.empty:
             raise RuntimeError(f"{ticker} 시세를 가져오지 못했습니다")
-        closes = df["Close"].astype(float)
+        closes = df["Close"].astype(float).dropna()  # yfinance가 최근 종가를 비워 줄 때가 있다
+        if closes.empty:
+            raise RuntimeError(f"{ticker} 시세를 가져오지 못했습니다")
         closes.index = closes.index.tz_localize(None)
         return closes
 

@@ -1,4 +1,5 @@
 """보유 합산, 원화 평가액, 비중, 리밸런싱 제안."""
+import math
 from dataclasses import dataclass
 
 from agent.config import Holdings, Settings
@@ -52,6 +53,8 @@ def value_positions(positions: list[AggregatedPosition], closes: dict[str, float
     out = []
     for p in positions:
         close = closes.get(p.key)
+        if close is not None and math.isnan(close):
+            close = None
         fx = 1.0 if p.market == "KR" else usdkrw
         value = p.qty * close * fx if close is not None and fx else None
         out.append(PositionValue(p, close, value))
