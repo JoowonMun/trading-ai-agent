@@ -109,3 +109,37 @@ def test_nps_us_section_and_holding_line():
     assert "국민연금 미국 보유" in html and "2026-06-30" in html
     assert "NVIDIA CORPORATION" in html and "+50.0%" in html and "신규" in html and "OLDCO CORP" in html
     assert "국민연금 미국 보유 3위" in html and "-12.5%" in html
+
+
+def test_alert_mail_shows_only_alerts_and_comments():
+    from agent.report.schema import Alert
+    ctx = sample_context()
+    ctx.report_type = "alert"
+    ctx.alerts = [Alert(kind="level_cross", ticker="005930", name="삼성전자", market="KR",
+                        message="삼성전자 현재가 65,000원 — 재검토 기준가(60,350원) 아래로 내려왔어요", important=True)]
+    a = Analysis(date="2026-10-15", summary=["재검토 알림 1건"], alert_comments={"005930": "처음 산 이유를 점검해 보세요."})
+    html = render_report(ctx, a, [])
+    assert "투자 알림" in html and "재검토 기준가(60,350원)" in html and "처음 산 이유를 점검" in html
+    assert "용어 풀이" not in html and "Apple" not in html     # 알림 없는 종목·긴 섹션은 없음
+
+
+def test_alert_mail_without_ai_uses_auto_summary():
+    from agent.report.schema import Alert
+    ctx = sample_context()
+    ctx.report_type = "alert"
+    ctx.alerts = [Alert(kind="big_move", ticker="005930", name="삼성전자", market="KR", message="m", important=True)]
+    assert "알림 1건 (중요 1건)" in render_report(ctx, None, [])
+
+
+def test_weekly_section():
+    from agent.report.schema import WeeklyDiff, WeeklyHolding
+    ctx = sample_context()
+    ctx.weekly = WeeklyDiff(since="2026-10-08", total_krw=8_000_000, prev_total_krw=7_500_000, total_change_pct=6.67,
+                            index_changes={"KOSPI": 4.17},
+                            holdings=[WeeklyHolding(ticker="005930", name="삼성전자", market="KR", status="held",
+                                                    close=65000, prev_close=60000, return_pct=8.33,
+                                                    signal="hold", prev_signal="add", weight_pct=8.2, prev_weight_pct=7.0),
+                                      WeeklyHolding(ticker="OLD", name="옛종목", market="US", status="sold")])
+    html = render_report(ctx, None, [])
+    assert "지난주 대비" in html and "+8.3%" in html and "추가매수 → 보유" in html and "전량 매도" in html
+    assert "+6.7%" in html and "주간 투자 리포트" in html

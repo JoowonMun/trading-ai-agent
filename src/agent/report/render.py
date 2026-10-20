@@ -50,6 +50,9 @@ def price_ladder(h: HoldingContext) -> list[tuple[str, float, bool]]:
 
 
 def auto_summary(context: Context) -> list[str]:
+    if context.report_type == "alert":
+        important = sum(1 for a in context.alerts if a.important)
+        return [f"알림 {len(context.alerts)}건 (중요 {important}건)"]
     counts = Counter(h.signal for h in context.holdings if h.signal)
     lines = [f"추가매수 후보 {counts['add']}개 · 일부매도 {counts['trim']}개 · "
              f"재검토 {counts['review']}개 · 보유 {counts['hold']}개"]
@@ -65,8 +68,18 @@ def auto_summary(context: Context) -> list[str]:
 
 
 def render_report(context: Context, analysis: Analysis | None, notes: list[str]) -> str:
-    return _env.get_template("email.html").render(
-        title=f"투자 리포트 {context.date}",
+    if context.report_type == "alert":
+        template, title = "alert.html", f"투자 알림 {context.date}"
+    else:
+        template = "email.html"
+        title = f"{'주간 ' if context.weekly else ''}투자 리포트 {context.date}"
+    alerts_by_ticker: dict[str, list] = {}
+    for a in context.alerts:
+        alerts_by_ticker.setdefault(a.ticker, []).append(a)
+    return _env.get_template(template).render(
+        title=title,
+        alerts_by_ticker=alerts_by_ticker,
+        holdings_by_ticker={h.ticker: h for h in context.holdings},
         context=context,
         analysis=analysis,
         analyses={h.ticker: h for h in analysis.holdings} if analysis else {},

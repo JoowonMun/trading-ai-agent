@@ -33,6 +33,29 @@
 {% endfor %}
 </table>
 
+{% if context.weekly %}{% set w = context.weekly %}
+<h2 style="{{ H2 }}">지난주 대비 <span style="font-size:13px;color:#78716c;font-weight:normal;">({{ w.since }} 이후)</span></h2>
+<p style="margin:0 0 8px;">총평가액 {{ w.total_krw|money }}{% if w.total_change_pct is not none %} <strong style="color:{{ '#15803d' if w.total_change_pct >= 0 else '#b91c1c' }};">{{ "%+.1f"|format(w.total_change_pct) }}%</strong>{% endif %}
+{% for name, c in w.index_changes.items() %} · {{ name }} {{ "%+.1f"|format(c) }}%{% endfor %}</p>
+<table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px;">
+<tr><th style="{{ TH }}text-align:left;">종목</th><th style="{{ TH }}text-align:right;">1주 수익률</th><th style="{{ TH }}">신호 변화</th><th style="{{ TH }}text-align:right;">비중 변화</th></tr>
+{% for r in w.holdings %}
+<tr><td style="{{ TD }}">{{ r.name }}</td>
+{% if r.status == "sold" %}<td style="{{ TD }}text-align:right;color:#78716c;" colspan="3">전량 매도</td>
+{% elif r.status == "new" %}<td style="{{ TD }}text-align:right;color:#78716c;" colspan="3">신규 편입</td>
+{% else %}
+<td style="{{ TD }}text-align:right;color:{{ '#15803d' if (r.return_pct or 0) > 0 else '#b91c1c' if (r.return_pct or 0) < 0 else '#57534e' }};">{{ "%+.1f"|format(r.return_pct) ~ "%" if r.return_pct is not none else "-" }}</td>
+<td style="{{ TD }}text-align:center;">{% if r.prev_signal and r.signal and r.prev_signal != r.signal %}{{ signal_labels[r.prev_signal] }} → {{ signal_labels[r.signal] }}{% else %}-{% endif %}</td>
+<td style="{{ TD }}text-align:right;">{% if r.weight_pct is not none and r.prev_weight_pct is not none %}{{ "%+.1f"|format(r.weight_pct - r.prev_weight_pct) }}%p{% else %}-{% endif %}</td>
+{% endif %}</tr>
+{% endfor %}
+</table>
+{% if w.alerts %}
+<div style="font-size:13px;font-weight:600;margin:12px 0 4px;">이번 주 알림</div>
+<ul style="font-size:13px;margin:0;padding-left:20px;">{% for a in w.alerts[:15] %}<li>{{ a.message }}</li>{% endfor %}</ul>
+{% endif %}
+{% endif %}
+
 {% if context.market.indices or context.market.fx_usdkrw %}
 <h2 style="{{ H2 }}">시장</h2>
 <table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px;">
