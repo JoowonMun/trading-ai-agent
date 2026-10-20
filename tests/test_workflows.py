@@ -20,3 +20,10 @@ def test_daily_report_schedule_is_weekday_morning_kst():
     triggers = data[True]  # YAML 1.1에서 'on'은 True로 읽힌다
     assert triggers["schedule"][0]["cron"] == "17 21 * * 0-4"   # 월~금 06:17 KST
     assert "workflow_dispatch" in triggers
+
+
+def test_daily_report_uses_history_repo_and_skips_quiet_days():
+    text = Path(".github/workflows/daily-report.yml").read_text(encoding="utf-8")
+    assert "repository: JoowonMun/trading-ai-agent-data" in text and "DATA_REPO_DEPLOY_KEY" in text
+    assert "--history-dir data" in text and "save-snapshot" in text
+    assert "REPORT_TYPE" in text

@@ -39,3 +39,10 @@ gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo JoowonMun/trading-ai-agent
 - 나무 토큰은 실행마다 새로 받으므로 **평일마다 NH 보안 알림 1건**이 온다.
 - 수집이 실패하면 "생성 실패" 메일이, AI 해설이 실패하면 숫자 리포트가 발송된다.
 - 실행 시각은 GitHub 사정으로 몇 분~수십 분 늦어질 수 있다.
+
+## 알림 + 주간 리포트 (기록 저장소)
+- 매일 결과 요약(스냅샷)을 비공개 저장소 `JoowonMun/trading-ai-agent-data`에 커밋한다. 접근은 그 저장소에만 쓰기 권한이 있는 deploy key(Secret `DATA_REPO_DEPLOY_KEY`).
+- **월요일**: 전체 리포트 + 지난주 대비 / **화~금**: 직전 기록 대비 변화(신호 변경, 기준가 통과, ±5% 변동, 새 공시, 국민연금 신고, 미국 실적 D-3)가 있을 때만 알림 메일. 변화가 없으면 메일·AI 해설을 건너뛴다.
+- 첫 실행은 기준 스냅샷만 저장한다(월요일이 아니면 메일 없음).
+- 수동 실행의 "메일을 보내지 않고 점검만"(dry_run)은 스냅샷도 저장하지 않는다.
+- 큰 변동 기준은 `config/settings.yaml`의 `alert_move_pct`(기본 5).
