@@ -97,7 +97,7 @@ jobs:
               --model claude-opus-5-5 \
               --permission-mode acceptEdits \
               --allowedTools "Read" "Write" "Edit" "Bash(uv run python -m agent check:*)" "WebSearch" "WebFetch" \
-              --output-format json > out/claude.json 2>&1; then
+              --output-format json < /dev/null > out/claude.json 2>&1; then
             echo "AI 해설 작성 완료"
           else
             echo "AI 해설 실패 — 숫자 리포트로 발송"
