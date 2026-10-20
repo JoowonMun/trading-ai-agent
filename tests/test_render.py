@@ -120,7 +120,7 @@ def test_alert_mail_shows_only_alerts_and_comments():
     a = Analysis(date="2026-10-15", summary=["재검토 알림 1건"], alert_comments={"005930": "처음 산 이유를 점검해 보세요."})
     html = render_report(ctx, a, [])
     assert "투자 알림" in html and "재검토 기준가(60,350원)" in html and "처음 산 이유를 점검" in html
-    assert "용어 풀이" not in html and "Apple" not in html     # 알림 없는 종목·긴 섹션은 없음
+    assert "용어 풀이" not in html and "<strong>Apple</strong>" not in html   # 알림 없는 종목·긴 섹션은 없음 (글꼴 이름 "Apple SD Gothic"과 구분)
 
 
 def test_alert_mail_without_ai_uses_auto_summary():
