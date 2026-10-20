@@ -59,21 +59,25 @@ def resolve_holdings(settings: Settings, manual: Holdings, notes: list[str], nh_
 
 
 def apply_history(context: Context, settings: Settings, store, today: date) -> None:
-    """직전 스냅샷과 비교해 알림·메일 종류·주간 비교를 채운다. 저장소 오류는 첫 실행처럼 처리한다."""
+    """직전 스냅샷과 비교해 알림·메일 종류·주간 비교를 채운다.
+
+    기록을 읽다 생기는 어떤 오류든(저장소 없음, 깨진 파일, 옛 형식) 첫 실행처럼 처리하고 리포트는 계속한다.
+    """
     try:
         prev = store.latest_before(today)
+        context.alerts = detect_alerts(prev, context, settings)
+        context.report_type = decide_report_type(today, prev, context.alerts)
+        if context.report_type == "weekly":
+            week_prev = store.on_or_before(today - timedelta(days=7)) or prev
+            if week_prev is not None:
+                start = date.fromisoformat(week_prev["date"]) + timedelta(days=1)
+                week_alerts = [Alert(**a) for s in store.between(start, today - timedelta(days=1))
+                               for a in s.get("alerts", [])] + context.alerts
+                context.weekly = weekly_diff(week_prev, context, week_alerts)
     except Exception as e:
-        log.warning("기록 저장소 읽기 실패: %s", type(e).__name__)
-        store, prev = None, None
-    context.alerts = detect_alerts(prev, context, settings)
-    context.report_type = decide_report_type(today, prev, context.alerts)
-    if context.report_type == "weekly" and store is not None:
-        week_prev = store.on_or_before(today - timedelta(days=7)) or prev
-        if week_prev is not None:
-            start = date.fromisoformat(week_prev["date"]) + timedelta(days=1)
-            week_alerts = [Alert(**a) for s in store.between(start, today - timedelta(days=1))
-                           for a in s.get("alerts", [])] + context.alerts
-            context.weekly = weekly_diff(week_prev, context, week_alerts)
+        log.warning("기록 저장소 읽기 실패 — 첫 실행처럼 진행: %s", type(e).__name__)
+        context.alerts, context.weekly = [], None
+        context.report_type = decide_report_type(today, None, [])
     log.info("메일 종류: %s (알림 %d건)", context.report_type, len(context.alerts))
 
 

@@ -82,3 +82,11 @@ def test_save_snapshot(tmp_path):
     cli.main(publish_args(tmp_path, config, "save-snapshot", "--history-dir", str(tmp_path / "data")))
     saved = json.loads((tmp_path / "data" / "snapshots" / "2026-10-15.json").read_text(encoding="utf-8"))
     assert saved["date"] == "2026-10-15"
+
+
+def test_apply_history_corrupt_older_snapshot_treated_as_first_run(tmp_path):
+    store = seeded_store(tmp_path, close=60000)
+    (tmp_path / "data" / "snapshots" / "2026-10-01.json").write_text("{깨진 파일", encoding="utf-8")
+    ctx = sample_context()
+    cli.apply_history(ctx, Settings(), store, date(2026, 10, 19))   # 월요일: 7일 전 조회에서 깨진 파일을 읽음
+    assert ctx.report_type == "weekly" and ctx.weekly is None

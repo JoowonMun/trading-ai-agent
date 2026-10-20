@@ -117,7 +117,11 @@ jobs:
       - name: 오늘 스냅샷을 기록 저장소에 저장 (시험 실행은 저장하지 않음)
         if: ${{ inputs.dry_run != true }}
         run: |
-          uv run python -m agent save-snapshot --history-dir data --date "$REPORT_DATE" > out/snapshot.log 2>&1
+          # 기록 저장소 체크아웃이 실패했다면 data/는 공개 저장소 안의 빈 폴더다 — 보유 내역이 공개 쪽에 커밋되지 않게 멈춘다
+          [ -d data/.git ] || { echo "기록 저장소 없음 — 스냅샷 저장 생략"; exit 1; }
+          if ! uv run python -m agent save-snapshot --history-dir data --date "$REPORT_DATE" > out/snapshot.log 2>&1; then
+            echo "스냅샷 생성 실패"; tail -n 3 out/snapshot.log | sed -E 's/(KR|US):[A-Za-z0-9.-]+/\1:<종목>/g; s/[0-9]{6,}/<num>/g'; exit 1
+          fi
           cd data
           git config user.name "trading-ai-agent"
           git config user.email "actions@users.noreply.github.com"

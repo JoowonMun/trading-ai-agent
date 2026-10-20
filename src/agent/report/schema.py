@@ -17,6 +17,7 @@ class Alert(BaseModel):
     market: Literal["KR", "US"]
     message: str
     important: bool = False
+    values: list[float] = []  # 문구에 들어간 숫자(가격·등락률 등) — 검증기가 AI 해설의 근거로 쓴다
 
 
 class WeeklyHolding(BaseModel):

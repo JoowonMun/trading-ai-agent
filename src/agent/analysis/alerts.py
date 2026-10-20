@@ -31,9 +31,9 @@ def detect_alerts(prev: dict | None, ctx: Context, settings: Settings) -> list[A
     alerts: list[Alert] = []
 
     for h in ctx.holdings:
-        def add(kind, message, important=False):
+        def add(kind, message, important=False, values=()):
             alerts.append(Alert(kind=kind, ticker=h.ticker, name=h.name, market=h.market, message=message,
-                                important=important))
+                                important=important, values=list(values)))
 
         p = prev_by.get((h.market, h.ticker))
         close = h.price.close if h.price else None
@@ -50,11 +50,12 @@ def detect_alerts(prev: dict | None, ctx: Context, settings: Settings) -> list[A
                         direction = "아래로 내려왔어요" if close < level else "위로 올라섰어요"
                         add("level_cross", f"{h.name} 현재가 {_money(close, h.market)} — "
                                            f"{label}({_money(level, h.market)}) {direction}",
-                            important=key in IMPORTANT_LEVELS)
+                            important=key in IMPORTANT_LEVELS, values=(close, level))
                 change = (close / before - 1) * 100
                 if abs(change) >= settings.alert_move_pct:
                     add("big_move", f"{h.name} {change:+.1f}% ({prev_date} 대비, {_money(before, h.market)} → "
-                                    f"{_money(close, h.market)})", important=True)
+                                    f"{_money(close, h.market)})", important=True,
+                    values=(round(change, 1), before, close))
             known = set(p.get("disclosures", []))
             for d in h.disclosures:
                 if d.url not in known:
@@ -62,7 +63,8 @@ def detect_alerts(prev: dict | None, ctx: Context, settings: Settings) -> list[A
             nps_date = (h.nps or {}).get("date")
             if h.nps and nps_date and nps_date > (p.get("nps_date") or ""):
                 change_txt = f" ({h.nps['change_pct']:+.2f}%p)" if h.nps.get("change_pct") is not None else ""
-                add("nps", f"국민연금 {h.name} 지분 {h.nps['stake_pct']:.2f}%{change_txt} · {nps_date} 신고")
+                add("nps", f"국민연금 {h.name} 지분 {h.nps['stake_pct']:.2f}%{change_txt} · {nps_date} 신고",
+                    values=[v for v in (h.nps["stake_pct"], h.nps.get("change_pct")) if v is not None])
 
         days = _days_until(h.next_earnings, today)
         if days is not None and 0 <= days <= EARNINGS_WINDOW_DAYS:

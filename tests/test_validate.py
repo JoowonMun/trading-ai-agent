@@ -87,7 +87,8 @@ def alert_context():
     ctx = sample_context()
     ctx.report_type = "alert"
     ctx.alerts = [Alert(kind="big_move", ticker="005930", name="삼성전자", market="KR",
-                        message="삼성전자 -6.2% (2026-10-14 대비, 69,300원 → 65,000원)", important=True)]
+                        message="삼성전자 -6.2% (2026-10-14 대비, 69,300원 → 65,000원)", important=True,
+                        values=[-6.2, 69300.0, 65000.0])]
     return ctx
 
 
@@ -105,3 +106,27 @@ def test_alert_comment_fabricated_number_rejected():
 def test_alert_comment_for_unknown_ticker_rejected():
     raw = {"date": "2026-10-15", "summary": ["x"], "alert_comments": {"ZZZZ": "설명"}}
     assert any("ZZZZ" in e for e in validate_analysis(raw, alert_context())[1])
+
+
+def test_weekly_numbers_are_allowed_in_summary():
+    from agent.report.schema import WeeklyDiff
+    ctx = sample_context()
+    ctx.weekly = WeeklyDiff(since="2026-10-08", total_change_pct=3.27)
+    raw = analysis()
+    raw["summary"] = ["지난주 대비 총평가액 +3.3%"]
+    assert validate_analysis(raw, ctx)[1] == []
+
+
+def test_date_fragments_in_alerts_do_not_become_allowed_numbers():
+    raw = {"date": "2026-10-15", "summary": ["x"],
+           "alert_comments": {"005930": "앞으로 14% 더 빠질 수 있어요"}}   # 14는 알림 문구의 날짜(10-14)뿐
+    assert any("14%" in e for e in validate_analysis(raw, alert_context())[1])
+
+
+def test_alert_numbers_of_other_stock_not_allowed():
+    from agent.report.schema import Alert
+    ctx = alert_context()
+    ctx.alerts.append(Alert(kind="big_move", ticker="AAPL", name="Apple", market="US",
+                            message="Apple +7.7%", values=[7.7, 214.0, 230.5]))
+    raw = {"date": "2026-10-15", "summary": ["x"], "alert_comments": {"005930": "Apple처럼 7.7% 오를 수도"}}
+    assert any("7.7%" in e for e in validate_analysis(raw, ctx)[1])

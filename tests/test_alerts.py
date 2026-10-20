@@ -87,3 +87,13 @@ def test_new_holding_has_no_comparison_alerts():
     prev = prev_from(ctx)
     prev["holdings"] = prev["holdings"][1:]     # 어제는 첫 종목이 없었다
     assert detect_alerts(prev, ctx, Settings()) == []
+
+
+def test_alerts_carry_numeric_values():
+    ctx = sample_context()
+    ctx.holdings[0].price.close = 59000
+    alerts = detect_alerts(prev_from(ctx, close=66000), ctx, Settings())
+    move = next(a for a in alerts if a.kind == "big_move")
+    assert move.values == [round(59000 / 66000 * 100 - 100, 1), 66000, 59000]
+    cross = next(a for a in alerts if a.kind == "level_cross")
+    assert cross.values == [59000, 60350]

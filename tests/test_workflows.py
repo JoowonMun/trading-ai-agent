@@ -27,3 +27,9 @@ def test_daily_report_uses_history_repo_and_skips_quiet_days():
     assert "repository: JoowonMun/trading-ai-agent-data" in text and "DATA_REPO_DEPLOY_KEY" in text
     assert "--history-dir data" in text and "save-snapshot" in text
     assert "REPORT_TYPE" in text
+
+
+def test_snapshot_step_refuses_without_history_checkout_and_data_is_ignored():
+    text = Path(".github/workflows/daily-report.yml").read_text(encoding="utf-8")
+    assert "[ -d data/.git ]" in text
+    assert "data/" in Path(".gitignore").read_text(encoding="utf-8").splitlines()
