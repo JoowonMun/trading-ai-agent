@@ -6,6 +6,42 @@ from pydantic import BaseModel, Field
 from agent.config import Profile
 
 Signal = Literal["add", "hold", "trim", "review"]
+AlertKind = Literal["signal_change", "level_cross", "big_move", "disclosure", "nps", "earnings_soon"]
+ReportType = Literal["weekly", "alert", "none"]
+
+
+class Alert(BaseModel):
+    kind: AlertKind
+    ticker: str
+    name: str
+    market: Literal["KR", "US"]
+    message: str
+    important: bool = False
+
+
+class WeeklyHolding(BaseModel):
+    ticker: str
+    name: str
+    market: Literal["KR", "US"]
+    status: Literal["held", "new", "sold"]
+    close: float | None = None
+    prev_close: float | None = None
+    return_pct: float | None = None
+    signal: str | None = None
+    prev_signal: str | None = None
+    weight_pct: float | None = None
+    prev_weight_pct: float | None = None
+
+
+class WeeklyDiff(BaseModel):
+    since: str
+    holdings: list[WeeklyHolding] = []
+    total_krw: float | None = None
+    prev_total_krw: float | None = None
+    total_change_pct: float | None = None
+    class_changes: dict[str, dict] = {}
+    index_changes: dict[str, float] = {}
+    alerts: list[Alert] = []
 
 
 class PriceSnapshot(BaseModel):
@@ -87,6 +123,7 @@ class HoldingContext(BaseModel):
     nps: dict | None = None
     disclosures: list[Disclosure] = []
     flows: Flows | None = None
+    next_earnings: str | None = None  # 미국 종목 다음 실적 발표일 (YYYY-MM-DD)
     missing: list[str] = []
 
 
@@ -138,6 +175,9 @@ class Context(BaseModel):
     watchlist: list[dict] = []
     glossary_terms: list[str] = []
     notes: list[str] = []
+    report_type: ReportType = "weekly"  # weekly=전체 리포트, alert=알림 메일, none=보내지 않음
+    alerts: list[Alert] = []
+    weekly: WeeklyDiff | None = None
 
 
 class IndicatorNote(BaseModel):
@@ -160,6 +200,7 @@ class Analysis(BaseModel):
     date: str
     summary: list[str] = Field(min_length=1, max_length=3)
     market_comment: str = ""
-    holdings: list[HoldingAnalysis]
+    holdings: list[HoldingAnalysis] = []
     portfolio_comment: str = ""
     watchlist_comment: str = ""
+    alert_comments: dict[str, str] = {}  # 알림 메일: 티커 → 한두 문장 해설
