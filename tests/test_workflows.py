@@ -33,3 +33,8 @@ def test_snapshot_step_refuses_without_history_checkout_and_data_is_ignored():
     text = Path(".github/workflows/daily-report.yml").read_text(encoding="utf-8")
     assert "[ -d data/.git ]" in text
     assert "data/" in Path(".gitignore").read_text(encoding="utf-8").splitlines()
+
+
+def test_ai_step_allows_web_research():
+    text = Path(".github/workflows/daily-report.yml").read_text(encoding="utf-8")
+    assert '"WebSearch"' in text and '"WebFetch"' in text
