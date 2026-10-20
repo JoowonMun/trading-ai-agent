@@ -26,7 +26,7 @@ from agent.history.store import SnapshotStore
 from agent.report.context import build_context
 from agent.report.render import render_report
 from agent.report.schema import Alert, Context
-from agent.report.validate import validate_analysis
+from agent.report.validate import check_move_reasons, validate_analysis
 
 log = logging.getLogger("agent")
 
@@ -118,6 +118,10 @@ def cmd_publish(args) -> Path:
         if errors:
             notes.append("AI 분석 검증 실패 → 숫자 리포트로 대체")
             notes.extend(errors[:5])
+        elif reason_errors := check_move_reasons(analysis, context):
+            analysis.move_reasons = {}   # 원인 조사만 빼고 나머지 해설은 살린다
+            notes.append("원인 조사 결과 검증 실패 → 제외")
+            notes.extend(reason_errors[:3])
         log.info("AI 해설 상태: %s", f"검증 실패 {len(errors)}건" if errors else "검증 통과")
     else:
         notes.append("AI 분석 없음 → 숫자 리포트")
@@ -145,7 +149,9 @@ def cmd_check(args) -> None:
     """AI가 쓴 analysis.json을 검증만 한다 (작성 → check → 수정 반복용)."""
     day = _day_dir(args)
     context = Context.model_validate_json((day / "context.json").read_text(encoding="utf-8"))
-    _, errors = validate_analysis(json.loads((day / "analysis.json").read_text(encoding="utf-8")), context)
+    analysis, errors = validate_analysis(json.loads((day / "analysis.json").read_text(encoding="utf-8")), context)
+    if analysis is not None:
+        errors += check_move_reasons(analysis, context)
     if errors:
         print("검증 실패:")
         for e in errors:

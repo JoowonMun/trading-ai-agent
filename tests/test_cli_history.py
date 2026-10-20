@@ -92,3 +92,28 @@ def test_apply_history_corrupt_older_snapshot_treated_as_first_run(tmp_path):
     ctx = sample_context()
     cli.apply_history(ctx, Settings(), store, date(2026, 10, 19))   # 월요일: 7일 전 조회에서 깨진 파일을 읽음
     assert ctx.report_type == "weekly" and ctx.weekly is None
+
+
+def test_publish_drops_only_invalid_move_reasons(tmp_path, monkeypatch):
+    from agent.report.schema import Alert
+    config = tmp_path / "config"
+    config.mkdir()
+    (config / "settings.yaml").write_text("profile:\n  name: balanced\n", encoding="utf-8")
+    day = tmp_path / "out" / "2026-10-15"
+    day.mkdir(parents=True)
+    ctx = sample_context()
+    ctx.report_type = "alert"
+    ctx.research_targets = ["005930"]
+    ctx.alerts = [Alert(kind="big_move", ticker="005930", name="삼성전자", market="KR", message="삼성전자 -6.2%",
+                        values=[-6.2, 69300.0, 65000.0])]
+    (day / "context.json").write_text(ctx.model_dump_json(), encoding="utf-8")
+    (day / "analysis.json").write_text(json.dumps({
+        "date": "2026-10-15", "summary": ["삼성전자 하락"],
+        "alert_comments": {"005930": "차분하게 지켜볼 때예요."},
+        "move_reasons": {"005930": {"found": True, "summary": "영업이익이 30% 줄었다는 보도", "sources": ["https://x.com/a"]}},
+    }), encoding="utf-8")
+    monkeypatch.setattr(cli, "send_email", lambda *a: None)
+    cli.main(publish_args(tmp_path, config, "publish"))
+    html = (day / "preview.html").read_text(encoding="utf-8")
+    assert "차분하게 지켜볼 때예요" in html and "원인 조사 결과 검증 실패" in html
+    assert "영업이익이 30% 줄었다는" not in html

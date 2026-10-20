@@ -100,3 +100,20 @@ def validate_analysis(raw: dict, context: Context) -> tuple[Analysis | None, lis
         errors += [f"근거 없는 숫자: {bad}" for bad in _unsupported(text, allowed, percent_only)]
 
     return (None if errors else analysis), errors
+
+
+def check_move_reasons(analysis: Analysis, context: Context) -> list[str]:
+    """AI가 웹에서 찾은 '왜 움직였나'를 검사한다. 뉴스 속 숫자는 검증할 수 없어 단위 붙은 숫자를 금지한다."""
+    errors = []
+    targets = set(context.research_targets)
+    for ticker, reason in analysis.move_reasons.items():
+        if ticker not in targets:
+            errors.append(f"조사 대상이 아닌 종목: {ticker}")
+            continue
+        if reason.found and not 1 <= len(reason.sources) <= 3:
+            errors.append(f"{ticker}: 출처 링크는 1~3개여야 합니다")
+        if any(not s.startswith(("https://", "http://")) for s in reason.sources):
+            errors.append(f"{ticker}: 출처는 http(s) 링크여야 합니다")
+        if NUMBER_WITH_UNIT.search(reason.summary):
+            errors.append(f"{ticker}: 원인 요약에 숫자를 쓸 수 없습니다 ({NUMBER_WITH_UNIT.search(reason.summary).group(0)})")
+    return errors

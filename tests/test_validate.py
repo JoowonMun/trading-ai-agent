@@ -130,3 +130,43 @@ def test_alert_numbers_of_other_stock_not_allowed():
                             message="Apple +7.7%", values=[7.7, 214.0, 230.5]))
     raw = {"date": "2026-10-15", "summary": ["x"], "alert_comments": {"005930": "Apple처럼 7.7% 오를 수도"}}
     assert any("7.7%" in e for e in validate_analysis(raw, ctx)[1])
+
+
+def research_context():
+    ctx = alert_context()
+    ctx.research_targets = ["005930"]
+    return ctx
+
+
+def reasons(**r):
+    return {"005930": {"found": True, "summary": "반도체 업황 우려로 업종 전체가 약세였어요.",
+                       "sources": ["https://www.yna.co.kr/view/AKR20261015000000001"], **r}}
+
+
+def test_move_reasons_ok_and_not_found_ok():
+    from agent.report.schema import Analysis
+    from agent.report.validate import check_move_reasons
+    a = Analysis(date="2026-10-15", summary=["x"], move_reasons=reasons())
+    assert check_move_reasons(a, research_context()) == []
+    a = Analysis(date="2026-10-15", summary=["x"],
+                 move_reasons={"005930": {"found": False, "summary": "뚜렷한 원인을 찾지 못했어요."}})
+    assert check_move_reasons(a, research_context()) == []
+
+
+def test_move_reasons_rules():
+    from agent.report.schema import Analysis
+    from agent.report.validate import check_move_reasons
+    ctx = research_context()
+    bad = [reasons(sources=[]), reasons(summary="매출이 20% 늘었어요"), reasons(sources=["ftp://x"]),
+           reasons(sources=["https://a", "https://b", "https://c", "https://d"])]
+    for r in bad:
+        assert check_move_reasons(Analysis(date="2026-10-15", summary=["x"], move_reasons=r), ctx) != []
+    other = {"AAPL": reasons()["005930"]}
+    assert check_move_reasons(Analysis(date="2026-10-15", summary=["x"], move_reasons=other), ctx) != []
+
+
+def test_validate_analysis_ignores_move_reasons():
+    raw = {"date": "2026-10-15", "summary": ["삼성전자가 크게 내렸어요"],
+           "alert_comments": {"005930": "하루에 -6.2% 내렸어요."},
+           "move_reasons": reasons(summary="매출이 20% 늘었어요")}
+    assert validate_analysis(raw, research_context())[1] == []
