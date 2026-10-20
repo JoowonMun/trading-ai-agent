@@ -143,3 +143,27 @@ def test_weekly_section():
     html = render_report(ctx, None, [])
     assert "지난주 대비" in html and "+8.3%" in html and "추가매수 → 보유" in html and "전량 매도" in html
     assert "+6.7%" in html and "주간 투자 리포트" in html
+
+
+REASON = {"005930": {"found": True, "summary": "반도체 업황 우려로 업종 전체가 약세였어요.",
+                     "sources": ["https://www.yna.co.kr/view/AKR1", "https://www.hankyung.com/article/2"]}}
+
+
+def test_move_reason_in_alert_mail():
+    from agent.report.schema import Alert
+    ctx = sample_context()
+    ctx.report_type = "alert"
+    ctx.alerts = [Alert(kind="big_move", ticker="005930", name="삼성전자", market="KR", message="삼성전자 -6.2%")]
+    a = Analysis(date="2026-10-15", summary=["x"], move_reasons=REASON)
+    html = render_report(ctx, a, [])
+    assert "왜 움직였나" in html and "업종 전체가 약세" in html
+    assert 'href="https://www.yna.co.kr/view/AKR1"' in html and ">www.yna.co.kr<" in html
+
+
+def test_move_reason_in_weekly_report_and_not_found():
+    ctx = sample_context()
+    a = Analysis(date="2026-10-15", summary=["x"], holdings=[
+        {"ticker": "005930", "signal": "hold", "headline": "h", "reasoning": "r"}],
+        move_reasons={"005930": {"found": False, "summary": "뚜렷한 원인을 찾지 못했어요."}})
+    html = render_report(ctx, a, [])
+    assert "왜 움직였나" in html and "뚜렷한 원인을 찾지 못했어요" in html

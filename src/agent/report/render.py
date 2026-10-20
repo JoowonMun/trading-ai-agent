@@ -1,6 +1,7 @@
 """Context(+Analysis) → 메일 HTML."""
 from collections import Counter
 from pathlib import Path
+from urllib.parse import urlparse
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -35,7 +36,11 @@ def _signed_pct(value):
 
 _env = Environment(loader=FileSystemLoader(Path(__file__).parent / "templates"),
                    autoescape=select_autoescape(["html"]))
-_env.filters.update(num=_num, money=_money, signed_pct=_signed_pct)
+def _domain(url: str) -> str:
+    return urlparse(url).netloc or url
+
+
+_env.filters.update(num=_num, money=_money, signed_pct=_signed_pct, domain=_domain)
 
 
 def price_ladder(h: HoldingContext) -> list[tuple[str, float, bool]]:

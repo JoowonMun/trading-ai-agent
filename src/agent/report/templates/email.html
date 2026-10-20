@@ -4,6 +4,7 @@
 {%- macro badge(text, color) -%}
 <span style="display:inline-block;padding:2px 8px;border-radius:10px;color:#ffffff;font-size:12px;font-weight:600;white-space:nowrap;background:{{ color }};">{{ text }}</span>
 {%- endmacro -%}
+{% from "_parts.html" import move_reason %}
 <!doctype html>
 <html lang="ko">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }}</title></head>
@@ -79,6 +80,7 @@
   <p style="margin:6px 0;"><strong>{{ a.headline }}</strong></p>
   <p style="margin:0 0 8px;">{{ a.reasoning }}</p>
   {% if a.signal_downgraded_reason %}<p style="margin:0 0 8px;font-size:13px;">※ 계산상 추가매수였지만 보유로 낮춘 이유: {{ a.signal_downgraded_reason }}</p>{% endif %}
+  {{ move_reason(analysis.move_reasons.get(h.ticker)) }}
   {% endif %}
   {% if h.signal_reasons %}<p style="margin:4px 0 8px;font-size:13px;color:#57534e;">판단 근거: {{ h.signal_reasons|join(", ") }}</p>{% endif %}
 

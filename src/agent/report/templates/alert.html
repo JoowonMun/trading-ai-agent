@@ -2,6 +2,7 @@
 {%- macro badge(text, color) -%}
 <span style="display:inline-block;padding:2px 8px;border-radius:10px;color:#ffffff;font-size:12px;font-weight:600;white-space:nowrap;background:{{ color }};">{{ text }}</span>
 {%- endmacro -%}
+{% from "_parts.html" import move_reason %}
 <!doctype html>
 <html lang="ko">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }}</title></head>
@@ -25,6 +26,7 @@
   {% for a in items %}<li style="margin:3px 0;">{% if a.important %}{{ badge("중요", "#b91c1c") }} {% endif %}{{ a.message }}</li>{% endfor %}
   </ul>
   {% if analysis and analysis.alert_comments.get(ticker) %}<p style="margin:8px 0 0;">{{ analysis.alert_comments[ticker] }}</p>{% endif %}
+  {{ move_reason(analysis.move_reasons.get(ticker) if analysis else none) }}
 </div>
 {% endfor %}
 
