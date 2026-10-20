@@ -93,6 +93,11 @@ docs/superpowers/  설계 문서(spec)와 구현 계획(plan)
 - 국민연금 국내 지분 변동은 10% 이상 보유 종목의 신고만 잡힌다. 미국 13F는 분기 말 기준으로 약 45일 늦게 공개된다.
 - pykrx·yfinance·13f.info는 비공식 데이터 소스라 구조가 바뀌면 깨질 수 있다(실패 시 해당 항목만 "데이터 누락").
 
+## 문서
+
+- [INTENT.md](INTENT.md) — 이 프로젝트의 목적·원칙·하지 않는 것·로드맵
+- [CLAUDE.md](CLAUDE.md) — 개발 지침(작업 원칙, 불변식, 보안 규칙, 겪어본 함정)
+
 ## 개발 방식
 
 설계 문서 → 구현 계획 → 테스트 먼저 작성(TDD) 순서로 [Claude Code](https://claude.com/claude-code)와 함께 개발했다.
