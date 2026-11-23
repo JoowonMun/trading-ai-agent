@@ -32,7 +32,8 @@ class SectorData:
         if df is None or df.empty or not {"종가", "PER", "PBR"} <= set(df.columns):
             raise RuntimeError("업종 지표를 가져오지 못했어요")
         out = df[["종가", "PER", "PBR"]].astype(float).rename(columns={"종가": "close", "PER": "per", "PBR": "pbr"})
-        return out[out["close"] > 0].sort_index()
+        published = (out["close"] > 0) & ((out["per"] > 0) | (out["pbr"] > 0))  # 오늘 행은 지표가 0으로 온다
+        return out[published].sort_index()
 
     def us_quote(self, ticker: str, today: date) -> tuple[float | None, pd.Series]:
         import yfinance as yf

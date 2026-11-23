@@ -1,5 +1,6 @@
 """수집 + 계산 → Context(context.json)."""
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
 import pandas as pd
@@ -27,6 +28,9 @@ log = logging.getLogger(__name__)
 GLOSSARY_TERMS = ["PER", "PBR", "ROE", "영업이익률", "매출 성장률", "영업이익 성장률", "부채비율", "배당수익률",
                   "이동평균선", "RSI", "52주 위치", "PER 밴드", "분할매수", "재검토 기준가", "리밸런싱",
                   "업종 온도계", "이익 방향"]
+
+
+KRX_WORKERS = 6
 
 
 class ContextError(RuntimeError):
@@ -184,14 +188,25 @@ def _attach_sectors(source, today: date) -> tuple[list[SectorRow], list[str]]:
     rows: list[SectorRow] = []
     missing: list[str] = []
     start = today - timedelta(days=365 * 5)
-    for code, name, method in KR_SECTORS:
+
+    def fetch(item):
+        code, name, method = item
         try:
-            rows.append(kr_row(code, name, method, source.kr_fundamentals(code, start, today)))
+            return kr_row(code, name, method, source.kr_fundamentals(code, start, today)), None
         except Exception as e:
-            if "KRX 계정" in str(e):
-                missing.append(f"국내 업종: {e}")
-                break
-            missing.append(f"국내 업종 {name}: {str(e).splitlines()[0]}")
+            return None, e
+
+    # KRX 응답이 건당 30~60초라 동시에 요청한다
+    with ThreadPoolExecutor(KRX_WORKERS) as pool:
+        results = list(pool.map(fetch, KR_SECTORS))
+    for (_, name, _), (row, error) in zip(KR_SECTORS, results):
+        if row is not None:
+            rows.append(row)
+        elif "KRX 계정" in str(error):
+            missing.append(f"국내 업종: {error}")
+            break
+        else:
+            missing.append(f"국내 업종 {name}: {str(error).splitlines()[0]}")
     for ticker, name in US_SECTORS:
         try:
             per, closes = source.us_quote(ticker, today)

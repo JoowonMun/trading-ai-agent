@@ -164,3 +164,39 @@ def test_live_sector_data():
     assert len(df) >= 1000 and set(df.columns) >= {"close", "per", "pbr"}
     per, closes = SectorData().us_quote("XLK", today)
     assert per and per > 0 and len(closes) > 200
+
+
+def test_kr_fundamentals_drops_unpublished_today_row(monkeypatch):
+    from pykrx import stock
+
+    from agent.collectors.sectors import SectorData
+    monkeypatch.setenv("KRX_ID", "x")
+    monkeypatch.setenv("KRX_PW", "y")
+    raw = pd.DataFrame({"종가": [100.0, 98.0], "등락률": [0.0, -2.0], "PER": [8.0, 0.0], "PBR": [1.2, 0.0],
+                        "배당수익률": [1.0, 0.0]}, index=pd.to_datetime(["2026-11-20", "2026-11-23"]))
+    monkeypatch.setattr(stock, "get_index_fundamental", lambda *a: raw)
+    df = SectorData().kr_fundamentals("1013", date(2021, 11, 23), date(2026, 11, 23))
+    assert list(df.index.strftime("%Y-%m-%d")) == ["2026-11-20"] and df["per"].iloc[-1] == 8.0
+
+
+def test_attach_sectors_fetches_kr_in_parallel():
+    import threading
+    import time
+
+    from agent.report.context import _attach_sectors
+
+    class Slow(FakeSectors):
+        active = peak = 0
+        lock = threading.Lock()
+
+        def kr_fundamentals(self, code, start, end):
+            with self.lock:
+                Slow.active += 1
+                Slow.peak = max(Slow.peak, Slow.active)
+            time.sleep(0.05)
+            with self.lock:
+                Slow.active -= 1
+            return super().kr_fundamentals(code, start, end)
+
+    rows, _ = _attach_sectors(Slow(), date(2026, 11, 23))
+    assert Slow.peak > 1 and [r.key for r in rows[:2]] == ["KR:1013", "KR:1008"]   # 순서는 목록 그대로
