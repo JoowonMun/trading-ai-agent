@@ -170,3 +170,14 @@ def test_validate_analysis_ignores_move_reasons():
            "alert_comments": {"005930": "하루에 -6.2% 내렸어요."},
            "move_reasons": reasons(summary="매출이 20% 늘었어요")}
     assert validate_analysis(raw, research_context())[1] == []
+
+
+def test_sector_numbers_allowed_in_market_comment():
+    from agent.report.schema import SectorRow
+    ctx = sample_context()
+    ctx.sectors = [SectorRow(key="KR:1018", name="건설", market="KR", method="PBR", value=0.68, percentile=12.0)]
+    raw = analysis()
+    raw["market_comment"] = "건설 업종 PBR 0.68배로 과거 5년 중 하위 12%예요"
+    assert validate_analysis(raw, ctx)[1] == []
+    raw["market_comment"] = "건설 업종 PBR 0.55배예요"
+    assert validate_analysis(raw, ctx)[1] != []

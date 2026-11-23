@@ -118,3 +118,16 @@ def test_publish_drops_only_invalid_move_reasons(tmp_path, monkeypatch):
     html = (day / "preview.html").read_text(encoding="utf-8")
     assert "차분하게 지켜볼 때예요" in html and "원인 조사 결과 검증 실패" in html
     assert "영업이익이 30% 줄었다는" not in html
+
+
+def test_apply_history_monday_enriches_us_sectors(tmp_path):
+    from agent.report.schema import SectorRow
+    store = SnapshotStore(tmp_path / "data")
+    snap = make_snapshot(sample_context())
+    snap["date"] = "2026-10-12"
+    snap["sectors"] = {"US:XLK": {"method": "PER", "value": 28.0, "close": 280.0, "eps": 10.0}}
+    store.save(snap)
+    ctx = sample_context()
+    ctx.sectors = [SectorRow(key="US:XLK", name="기술", market="US", method="PER", value=30.0, close=300.0)]
+    cli.apply_history(ctx, Settings(), store, date(2026, 10, 19))
+    assert ctx.report_type == "weekly" and ctx.sectors[0].history_weeks == 2

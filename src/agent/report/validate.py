@@ -76,6 +76,7 @@ def validate_analysis(raw: dict, context: Context) -> tuple[Analysis | None, lis
     shared = _numbers(context.portfolio.model_dump()) + _numbers(context.market.model_dump())
     if context.weekly is not None:  # 월요일 '지난주 대비' 숫자
         shared += _numbers(context.weekly.model_dump(exclude={"alerts"}))
+    shared += _numbers([r.model_dump() for r in context.sectors])  # 업종 온도계 숫자
     per_holding = {h.ticker: _numbers(h.model_dump()) for h in context.holdings}
     percent_only = _numbers(context.profile.model_dump())
 
