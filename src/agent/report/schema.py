@@ -182,6 +182,20 @@ class SectorRow(BaseModel):
     note: str = ""
 
 
+class QuietSignal(BaseModel):
+    """조용한 신호: 큰 뉴스가 되기 전 회사가 공시한 일 (코드가 고름)."""
+    ticker: str
+    name: str
+    kind: Literal["contract", "facility", "buyback", "rights_issue"]
+    title: str
+    date: str
+    url: str
+    group: Literal["holding", "promising", "large"]
+    sector: str | None = None
+    why: str
+    caution: bool = False
+
+
 class Context(BaseModel):
     date: str
     profile: Profile
@@ -200,6 +214,10 @@ class Context(BaseModel):
     weekly: WeeklyDiff | None = None
     sectors: list[SectorRow] = []  # 업종 온도계 (월요일만)
     sectors_missing: list[str] = []
+    signals: list[QuietSignal] = []  # 조용한 신호 (월요일만)
+    signals_more: int = 0
+    signals_missing: list[str] = []
+    promising_sectors: list[str] = []
 
 
 class MoveReason(BaseModel):
