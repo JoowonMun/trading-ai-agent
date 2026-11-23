@@ -221,3 +221,32 @@ def test_percentile_shown_as_top_when_above_half_and_note_shown():
     ctx.sectors[2].note = "이익이 급증해 PER이 낮아 보일 수 있어요"
     html = render_report(ctx, None, [])
     assert "상위 29%" in html and "하위 12%" in html and "이익이 급증해" in html
+
+
+def signal_ctx():
+    from agent.report.schema import QuietSignal
+    ctx = sector_ctx()
+    ctx.sectors[2].name = "금속"
+    ctx.sectors[2].earnings_1y_pct = 91.2
+    ctx.promising_sectors = ["금속"]
+    base = dict(title="단일판매ㆍ공급계약체결", date="2026-11-18", why="계약은 앞으로 매출이 늘어날 근거예요")
+    ctx.signals = [QuietSignal(ticker="000002", name="가짜제강", kind="contract", url="https://dart.fss.or.kr/x?rcpNo=1",
+                               group="promising", sector="금속", **base),
+                   QuietSignal(ticker="000003", name="가짜전자", kind="rights_issue", url="https://dart.fss.or.kr/x?rcpNo=2",
+                               group="large", caution=True, title="유상증자결정", date="2026-11-17",
+                               why="주식 수가 늘어 기존 주주 몫이 줄 수 있어요")]
+    ctx.signals_more = 5
+    return ctx
+
+
+def test_signal_section_in_weekly():
+    html = render_report(signal_ctx(), None, [])
+    assert "조용한 신호" in html and "가짜제강" in html and "금속 · 이익 +91.2%" in html
+    assert 'href="https://dart.fss.or.kr/x?rcpNo=1"' in html and "⚠ 주식 수가 늘어" in html and "외 5건" in html
+
+
+def test_signal_section_absent_when_empty():
+    assert "이번 주 조용한 신호" not in render_report(sector_ctx(), None, [])
+    ctx = signal_ctx()
+    ctx.report_type = "alert"
+    assert "이번 주 조용한 신호" not in render_report(ctx, None, [])

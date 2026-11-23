@@ -90,6 +90,7 @@ def render_report(context: Context, analysis: Analysis | None, notes: list[str])
         context=context,
         sectors_kr=sort_rows([r for r in context.sectors if r.market == "KR"]),
         sectors_us=sort_rows([r for r in context.sectors if r.market == "US"]),
+        sector_by_name={r.name: r for r in context.sectors if r.market == "KR"},
         analysis=analysis,
         analyses={h.ticker: h for h in analysis.holdings} if analysis else {},
         summary=analysis.summary if analysis else auto_summary(context),

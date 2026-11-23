@@ -68,3 +68,65 @@ def test_rights_issue_is_caution():
     assert signals[0].caution and signals[0].why == WHY["rights_issue"]
     good, _ = pick_signals([filing("000001", CONTRACT)], set(), {}, {"000001"})
     assert not good[0].caution and good[0].why == WHY["contract"]
+
+
+class FakeDartMarket:
+    def __init__(self, fail=False):
+        self.fail = fail
+
+    def market_disclosures(self, start, end):
+        if self.fail:
+            raise RuntimeError("DART 다운")
+        assert (start.isoformat(), end.isoformat()) == ("2026-11-16", "2026-11-22")
+        return [filing("000001", CONTRACT, "20261118"), filing("000002", "자기주식취득결정", "20261119"),
+                filing("000003", "유상증자결정", "20261117")]
+
+
+class FakeSource:
+    def __init__(self, fail_members=False):
+        self.fail_members = fail_members
+
+    def latest_trading_day(self, today):
+        from datetime import date
+        return date(2026, 11, 20)
+
+    def kr_constituents(self, code, day):
+        if self.fail_members:
+            raise RuntimeError("KRX 오류")
+        return ["000002"] if code == "1011" else []
+
+    def market_cap_top(self, day, n):
+        return ["000003"]
+
+
+SECTORS = [SectorRow(key="KR:1011", name="금속", market="KR", method="PBR", earnings_1y_pct=91.2, level="싸요"),
+           SectorRow(key="KR:1018", name="건설", market="KR", method="PBR", earnings_1y_pct=50.0, level="비싸요")]
+
+
+def test_attach_signals_happy():
+    from datetime import date
+
+    from agent.report.context import _attach_signals
+    signals, more, missing, promising = _attach_signals(FakeDartMarket(), FakeSource(), SECTORS, {"000001"},
+                                                        date(2026, 11, 23))
+    assert [(s.ticker, s.group) for s in signals] == [("000001", "holding"), ("000002", "promising"),
+                                                      ("000003", "large")]
+    assert promising == ["금속"] and missing == [] and more == 0
+
+
+def test_attach_signals_krx_failure_drops_group():
+    from datetime import date
+
+    from agent.report.context import _attach_signals
+    signals, _, missing, _ = _attach_signals(FakeDartMarket(), FakeSource(fail_members=True), SECTORS, set(),
+                                             date(2026, 11, 23))
+    assert [s.group for s in signals] == ["large"] and len(missing) == 1 and "금속" in missing[0]
+
+
+def test_attach_signals_dart_failure():
+    from datetime import date
+
+    from agent.report.context import _attach_signals
+    signals, _, missing, _ = _attach_signals(FakeDartMarket(fail=True), FakeSource(), SECTORS, set(),
+                                             date(2026, 11, 23))
+    assert signals == [] and missing == ["조용한 신호: DART 다운"]

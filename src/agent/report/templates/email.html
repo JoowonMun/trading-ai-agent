@@ -77,6 +77,21 @@
 {% if context.sectors_missing %}<p style="font-size:12px;color:#a8a29e;margin:4px 0 0;">누락: {{ context.sectors_missing|join(" · ") }}</p>{% endif %}
 {% endif %}
 
+{% if context.signals or context.signals_missing %}
+<h2 style="{{ H2 }}">📎 이번 주 조용한 신호 <span style="font-size:13px;color:#78716c;font-weight:normal;">큰 뉴스가 되기 전 회사가 공시한 일</span></h2>
+{% set ns = namespace(head="") %}
+{% for s in context.signals %}
+{% if s.group == "promising" %}{% set r = sector_by_name.get(s.sector) %}{% set head = "유망 업종 · " ~ s.sector ~ ((" · 이익 " ~ "%+.1f"|format(r.earnings_1y_pct) ~ "%") if r and r.earnings_1y_pct is not none and r.earnings_1y_pct <= 200 else (" · 이익 +200% 넘게" if r and r.earnings_1y_pct else "")) ~ ((" · " ~ r.method ~ " " ~ r.level) if r and r.level else "") %}
+{% else %}{% set head = "내 종목" if s.group == "holding" else "큰 회사 (시가총액 상위)" %}{% endif %}
+{% if head != ns.head %}{% if ns.head %}</ul>{% endif %}<div style="font-size:13px;font-weight:600;margin:12px 0 4px;">[{{ head }}]</div><ul style="font-size:13px;margin:0;padding-left:20px;">{% set ns.head = head %}{% endif %}
+<li style="margin:0 0 6px;"><strong>{{ s.name }}</strong> — <a href="{{ s.url }}" style="color:#2563eb;">{{ s.title }}</a> ({{ s.date[5:]|replace("-", "/") }})<br>
+<span style="color:{{ '#b45309' if s.caution else '#57534e' }};">{{ "⚠ " if s.caution else "왜 볼까: " }}{{ s.why }}</span></li>
+{% endfor %}
+{% if ns.head %}</ul>{% endif %}
+<p style="font-size:13px;color:#57534e;margin:8px 0 0;">{% if context.signals_more %}외 {{ context.signals_more }}건 · {% endif %}공시는 사고팔 신호가 아니라 더 알아볼 거리예요.</p>
+{% if context.signals_missing %}<p style="font-size:12px;color:#a8a29e;margin:4px 0 0;">누락: {{ context.signals_missing|join(" · ") }}</p>{% endif %}
+{% endif %}
+
 {% if context.market.indices or context.market.fx_usdkrw %}
 <h2 style="{{ H2 }}">시장</h2>
 <table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px;">

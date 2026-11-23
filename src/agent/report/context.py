@@ -15,22 +15,24 @@ from agent.analysis.signals import decide_signal
 from agent.analysis.valuation import (band_valuation, choose_method, earnings_points, is_financial,
                                       multiples_from_points)
 from agent.collectors.common import NotACompany
+from agent.analysis.quiet_signals import pick_signals, promising_sectors
 from agent.analysis.sectors import kr_row, us_row
 from agent.collectors.dart import disclosure_url
 from agent.collectors.sectors import KR_SECTORS, US_SECTORS
 from agent.collectors.sec13f import normalize_issuer
 from agent.config import Holdings, Settings
 from agent.report.schema import (Context, Disclosure, Flows, HoldingContext, IndexQuote, Market, PositionInfo,
-                                 PriceSnapshot, SectorRow)
+                                 PriceSnapshot, QuietSignal, SectorRow)
 
 log = logging.getLogger(__name__)
 
 GLOSSARY_TERMS = ["PER", "PBR", "ROE", "영업이익률", "매출 성장률", "영업이익 성장률", "부채비율", "배당수익률",
                   "이동평균선", "RSI", "52주 위치", "PER 밴드", "분할매수", "재검토 기준가", "리밸런싱",
-                  "업종 온도계", "이익 방향"]
+                  "업종 온도계", "이익 방향", "조용한 신호"]
 
 
 KRX_WORKERS = 6
+LARGE_CAP_COUNT = 300
 
 
 class ContextError(RuntimeError):
@@ -217,6 +219,39 @@ def _attach_sectors(source, today: date) -> tuple[list[SectorRow], list[str]]:
     return rows, missing
 
 
+def _attach_signals(dart, source, sector_rows: list[SectorRow], holdings: set[str],
+                    today: date) -> tuple[list[QuietSignal], int, list[str], list[str]]:
+    """조용한 신호. KRX 실패는 그 그룹만, DART 실패는 섹션 전체를 누락으로 표시한다."""
+    promising = promising_sectors(sector_rows)
+    names = [r.name for r in promising]
+    try:
+        filings = dart.market_disclosures(today - timedelta(days=7), today - timedelta(days=1))
+    except Exception as e:
+        return [], 0, [f"조용한 신호: {str(e).splitlines()[0]}"], names
+
+    missing: list[str] = []
+    members: dict[str, str] = {}
+    large: set[str] = set()
+    try:
+        day = source.latest_trading_day(today)
+        for r in promising:
+            try:
+                for ticker in source.kr_constituents(r.key.split(":")[1], day):
+                    members.setdefault(ticker, r.name)
+            except Exception as e:
+                missing.append(f"유망 업종 {r.name} 소속 회사: {str(e).splitlines()[0]}")
+        try:
+            large = set(source.market_cap_top(day, LARGE_CAP_COUNT))
+        except Exception as e:
+            missing.append(f"시가총액 상위 회사: {str(e).splitlines()[0]}")
+    except Exception as e:
+        missing.append(f"유망 업종·큰 회사: {str(e).splitlines()[0]}")
+
+    signals, more = pick_signals(filings, holdings, members, large)
+    log.info("조용한 신호 %d건 (공시 %d건 중, 누락 %d)", len(signals), len(filings), len(missing))
+    return signals, more, missing, names
+
+
 def build_context(settings: Settings, holdings: Holdings, market, dart, today: date, us=None, nps=None,
                   sec=None, sectors=None) -> Context:
     market_info = _market(market, today)
@@ -282,7 +317,14 @@ def build_context(settings: Settings, holdings: Holdings, market, dart, today: d
         log.info("업종 온도계 수집")
         sector_rows, sectors_missing = _attach_sectors(sectors, today)
 
+    signals, signals_more, signals_missing, promising = [], 0, [], []
+    if sectors is not None and sector_rows:
+        log.info("조용한 신호 수집")
+        kr_held = {h.ticker for h in holding_contexts if h.market == "KR"}
+        signals, signals_more, signals_missing, promising = _attach_signals(dart, sectors, sector_rows, kr_held, today)
+
     return Context(date=today.isoformat(), profile=settings.profile, market=market_info,
                    holdings=holding_contexts, portfolio=portfolio, glossary_terms=GLOSSARY_TERMS,
                    nps_changes=nps_changes, nps_annual_as_of=nps_as_of, nps_us=nps_us,
-                   sectors=sector_rows, sectors_missing=sectors_missing)
+                   sectors=sector_rows, sectors_missing=sectors_missing, signals=signals,
+                   signals_more=signals_more, signals_missing=signals_missing, promising_sectors=promising)
