@@ -164,6 +164,24 @@ class Portfolio(BaseModel):
     nps_overlap: list[str] = []
 
 
+class SectorRow(BaseModel):
+    """업종 온도계 한 줄 (코드가 계산)."""
+    key: str  # "KR:1018" / "US:XLK"
+    name: str
+    market: Literal["KR", "US"]
+    method: Literal["PER", "PBR"]
+    value: float | None = None
+    percentile: float | None = None  # 과거 값 중 지금 위치 (0=가장 쌈, 100=가장 비쌈)
+    level: Literal["싸요", "보통", "비싸요"] | None = None
+    close: float | None = None
+    earnings_3m_pct: float | None = None
+    earnings_1y_pct: float | None = None
+    drawdown_52w_pct: float | None = None
+    return_3m_pct: float | None = None
+    history_weeks: int = 0
+    note: str = ""
+
+
 class Context(BaseModel):
     date: str
     profile: Profile
@@ -180,6 +198,8 @@ class Context(BaseModel):
     research_targets: list[str] = []  # AI가 '왜 움직였나'를 조사할 티커 (코드가 정함)
     alerts: list[Alert] = []
     weekly: WeeklyDiff | None = None
+    sectors: list[SectorRow] = []  # 업종 온도계 (월요일만)
+    sectors_missing: list[str] = []
 
 
 class MoveReason(BaseModel):
