@@ -7,6 +7,7 @@ from agent.report.schema import SectorRow
 
 MIN_DAYS = 240        # 가격 수준을 매기려면 유효한 날이 1년치는 있어야 한다
 DAYS_3M, DAYS_1Y = 63, 252
+SURGE_PCT = 100       # 1년 이익이 이보다 많이 늘었는데 PER로 '싸요'면 정점 함정 주의 문구
 
 
 def level_of(pct: float | None) -> str | None:
@@ -58,6 +59,8 @@ def kr_row(code: str, name: str, method: str, df: pd.DataFrame) -> SectorRow:
         for days, field in ((DAYS_3M, "earnings_3m_pct"), (DAYS_1Y, "earnings_1y_pct")):
             if len(eps) > days and pd.notna(eps.iloc[-1 - days]):
                 setattr(row, field, _change(now, float(eps.iloc[-1 - days])))
+    if method == "PER" and row.level == "싸요" and (row.earnings_1y_pct or 0) > SURGE_PCT:
+        row.note = "이익이 급증해 PER이 낮아 보일 수 있어요 — 경기를 타는 업종은 이익이 정점일 때 싸 보여요"
     row.drawdown_52w_pct, row.return_3m_pct = price_position(df["close"])
     return row
 

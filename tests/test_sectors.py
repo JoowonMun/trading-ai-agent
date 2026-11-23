@@ -205,3 +205,11 @@ def test_attach_sectors_fetches_kr_in_parallel():
 def test_kr_row_value_rounded():
     row = kr_row("1013", "전기전자", "PER", frame([7.360000133514404] * 300))
     assert row.value == 7.36
+
+
+def test_cheap_per_after_earnings_surge_gets_warning():
+    per = [20.0] * 300 + [7.0]
+    row = kr_row("1013", "전기전자", "PER", frame(per))           # EPS 100/20=5 → 100/7≈14.3 (+186%)
+    assert row.level == "싸요" and "이익이 급증" in row.note
+    calm = kr_row("1009", "제약", "PER", frame([10.0] * 300 + [9.0]))   # +11%
+    assert calm.level == "싸요" and calm.note == ""

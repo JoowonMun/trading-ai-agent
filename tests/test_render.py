@@ -213,3 +213,11 @@ def test_huge_earnings_change_is_capped_in_display():
     ctx.sectors[2].earnings_1y_pct = 2675.8
     html = render_report(ctx, None, [])
     assert "+200% 넘게" in html and "2675.8" not in html
+
+
+def test_percentile_shown_as_top_when_above_half_and_note_shown():
+    ctx = sector_ctx()
+    ctx.sectors[1].percentile, ctx.sectors[1].level = 71.0, "비싸요"
+    ctx.sectors[2].note = "이익이 급증해 PER이 낮아 보일 수 있어요"
+    html = render_report(ctx, None, [])
+    assert "상위 29%" in html and "하위 12%" in html and "이익이 급증해" in html
