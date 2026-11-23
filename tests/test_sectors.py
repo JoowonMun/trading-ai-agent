@@ -200,3 +200,8 @@ def test_attach_sectors_fetches_kr_in_parallel():
 
     rows, _ = _attach_sectors(Slow(), date(2026, 11, 23))
     assert Slow.peak > 1 and [r.key for r in rows[:2]] == ["KR:1013", "KR:1008"]   # 순서는 목록 그대로
+
+
+def test_kr_row_value_rounded():
+    row = kr_row("1013", "전기전자", "PER", frame([7.360000133514404] * 300))
+    assert row.value == 7.36

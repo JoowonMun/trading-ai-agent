@@ -66,7 +66,7 @@
 {% for r in rows %}{% set e = r.earnings_1y_pct if earn == "1y" else r.earnings_3m_pct %}
 <tr><td style="{{ TD }}white-space:nowrap;">{{ r.name }}</td>
 <td style="{{ TD }}">{% if r.value is not none %}{{ r.method }} {{ r.value|num(2) }}배{% else %}-{% endif %}{% if r.percentile is not none %} · 하위 {{ r.percentile|num(0) }}% <span style="font-weight:600;color:{{ '#15803d' if r.level == '싸요' else '#b91c1c' if r.level == '비싸요' else '#57534e' }};">{{ r.level }}</span>{% else %} <span style="color:#78716c;">({{ r.note or "과거 기록 쌓는 중" }})</span>{% endif %}</td>
-<td style="{{ TD }}text-align:right;color:{{ '#15803d' if (e or 0) > 0 else '#b91c1c' if (e or 0) < 0 else '#57534e' }};">{{ "%+.1f"|format(e) ~ "%" if e is not none else "-" }}</td>
+<td style="{{ TD }}text-align:right;color:{{ '#15803d' if (e or 0) > 0 else '#b91c1c' if (e or 0) < 0 else '#57534e' }};">{% if e is none %}-{% elif e > 200 %}+200% 넘게{% else %}{{ "%+.1f"|format(e) }}%{% endif %}</td>
 <td style="{{ TD }}text-align:right;">{{ "%+.1f"|format(r.drawdown_52w_pct) ~ "%" if r.drawdown_52w_pct is not none else "-" }}</td>
 <td style="{{ TD }}text-align:right;">{{ "%+.1f"|format(r.return_3m_pct) ~ "%" if r.return_3m_pct is not none else "-" }}</td></tr>
 {% endfor %}

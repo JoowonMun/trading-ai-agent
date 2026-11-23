@@ -41,7 +41,7 @@ def price_position(closes: pd.Series) -> tuple[float | None, float | None]:
 
 def kr_row(code: str, name: str, method: str, df: pd.DataFrame) -> SectorRow:
     row = SectorRow(key=f"KR:{code}", name=name, market="KR", method=method, close=float(df["close"].iloc[-1]))
-    col = df[method.lower()]
+    col = df[method.lower()].round(2)
     current = float(col.iloc[-1])
     valid = col[col > 0]
     if current > 0:

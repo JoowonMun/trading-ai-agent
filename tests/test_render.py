@@ -206,3 +206,10 @@ def test_sector_section_only_in_weekly_with_rows():
     ctx.report_type = "alert"
     assert "업종 온도계" not in render_report(ctx, None, [])
     assert "업종 온도계" not in render_report(sample_context(), None, [])
+
+
+def test_huge_earnings_change_is_capped_in_display():
+    ctx = sector_ctx()
+    ctx.sectors[2].earnings_1y_pct = 2675.8
+    html = render_report(ctx, None, [])
+    assert "+200% 넘게" in html and "2675.8" not in html
