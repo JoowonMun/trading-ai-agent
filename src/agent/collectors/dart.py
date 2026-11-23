@@ -155,3 +155,18 @@ class DartClient:
         data = self._get_json("list.json", corp_code=corp_code, bgn_de=start.strftime("%Y%m%d"),
                               end_de=end.strftime("%Y%m%d"), page_count="100")
         return (data or {}).get("list", [])
+
+    def market_disclosures(self, start: date, end: date) -> list[dict]:
+        """시장 전체 공시 — 주요사항보고(B)·거래소공시(I), 모든 페이지."""
+        rows = []
+        for kind in ("B", "I"):
+            page, total = 1, 1
+            while page <= total:
+                data = self._get_json("list.json", bgn_de=start.strftime("%Y%m%d"), end_de=end.strftime("%Y%m%d"),
+                                      pblntf_ty=kind, page_no=str(page), page_count="100")
+                if data is None:
+                    break
+                rows += data.get("list", [])
+                total = int(data.get("total_page") or 1)
+                page += 1
+        return rows

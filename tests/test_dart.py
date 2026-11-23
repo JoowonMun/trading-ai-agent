@@ -159,3 +159,25 @@ def test_cache_write_failure_does_not_lose_data(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Path, "write_text", locked)
     assert client(tmp_path, handler).financial_rows("C", 2025, 4) == [{"a": 1}]
+
+
+def test_market_disclosures_reads_all_pages(tmp_path):
+    seen = []
+
+    def handler(request):
+        p = request.url.params
+        seen.append((p["pblntf_ty"], p["page_no"]))
+        assert "corp_code" not in p and p["bgn_de"] == "20261116" and p["end_de"] == "20261122"
+        pages = 2 if p["pblntf_ty"] == "B" else 1
+        return httpx.Response(200, json={"status": "000", "total_page": pages,
+                                         "list": [{"rcept_no": f"{p['pblntf_ty']}{p['page_no']}"}]})
+
+    rows = client(tmp_path, handler).market_disclosures(date(2026, 11, 16), date(2026, 11, 22))
+    assert [r["rcept_no"] for r in rows] == ["B1", "B2", "I1"]
+    assert seen == [("B", "1"), ("B", "2"), ("I", "1")]
+
+
+def test_market_disclosures_empty_type(tmp_path):
+    def handler(request):
+        return httpx.Response(200, json={"status": "013"})
+    assert client(tmp_path, handler).market_disclosures(date(2026, 11, 16), date(2026, 11, 22)) == []

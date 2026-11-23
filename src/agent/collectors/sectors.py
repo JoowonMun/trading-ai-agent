@@ -41,3 +41,21 @@ class SectorData:
         closes = MarketData().us_closes(ticker, today - timedelta(days=380), today)
         per = yf.Ticker(ticker).info.get("trailingPE")
         return (float(per) if per else None), closes
+
+    def latest_trading_day(self, today: date) -> date:
+        """오늘 이전 가장 최근 거래일 (KRX는 오늘 자료가 비어 있을 수 있다)."""
+        from pykrx import stock
+
+        day = _quiet(stock.get_nearest_business_day_in_a_week, _yyyymmdd(today - timedelta(days=1)), True)
+        return date(int(day[:4]), int(day[4:6]), int(day[6:]))
+
+    def kr_constituents(self, code: str, day: date) -> list[str]:
+        from pykrx import stock
+
+        return list(_quiet(stock.get_index_portfolio_deposit_file, code, _yyyymmdd(day)))
+
+    def market_cap_top(self, day: date, n: int) -> list[str]:
+        from pykrx import stock
+
+        df = _quiet(stock.get_market_cap, _yyyymmdd(day), "ALL")
+        return list(df.sort_values("시가총액", ascending=False).index[:n])

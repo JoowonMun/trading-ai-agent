@@ -213,3 +213,52 @@ def test_cheap_per_after_earnings_surge_gets_warning():
     assert row.level == "싸요" and "이익이 급증" in row.note
     calm = kr_row("1009", "제약", "PER", frame([10.0] * 300 + [9.0]))   # +11%
     assert calm.level == "싸요" and calm.note == ""
+
+
+def fake_caps(monkeypatch):
+    from pykrx import stock
+
+    def get_market_cap(day, market="ALL"):
+        return pd.DataFrame({"시가총액": [10.0, 30.0, 20.0]}, index=["A", "B", "C"])
+
+    monkeypatch.setattr(stock, "get_market_cap", get_market_cap)
+
+
+def test_latest_trading_day_walks_back(monkeypatch):
+    from pykrx import stock
+
+    from agent.collectors.sectors import SectorData
+    asked = []
+    monkeypatch.setattr(stock, "get_nearest_business_day_in_a_week",
+                        lambda date, prev=True: asked.append((date, prev)) or "20261120")
+    assert SectorData().latest_trading_day(date(2026, 11, 23)) == date(2026, 11, 20)
+    assert asked == [("20261122", True)]          # 오늘이 아니라 어제부터 거슬러 올라감
+
+
+def test_market_cap_top_sorted(monkeypatch):
+    from agent.collectors.sectors import SectorData
+    fake_caps(monkeypatch)
+    assert SectorData().market_cap_top(date(2026, 11, 20), 2) == ["B", "C"]
+
+
+def test_kr_constituents(monkeypatch):
+    from pykrx import stock
+
+    from agent.collectors.sectors import SectorData
+    monkeypatch.setattr(stock, "get_index_portfolio_deposit_file", lambda code, day: ["005490", "010130"])
+    assert SectorData().kr_constituents("1011", date(2026, 11, 20)) == ["005490", "010130"]
+
+
+@pytest.mark.live
+def test_live_signal_sources():
+    import os
+    from pathlib import Path
+
+    from agent.collectors.dart import DartClient
+    from agent.collectors.sectors import SectorData
+    today = date.today()
+    s = SectorData()
+    day = s.latest_trading_day(today)
+    assert len(s.kr_constituents("1011", day)) > 10 and len(s.market_cap_top(day, 300)) == 300
+    dart = DartClient(os.environ["DART_API_KEY"], Path(".cache/dart"), today=today)
+    assert len(dart.market_disclosures(today - timedelta(days=7), today - timedelta(days=1))) > 0
