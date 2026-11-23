@@ -1,5 +1,5 @@
 """그날의 계산 결과 요약(스냅샷) — 알림 비교·주간 비교·성과 추적용. AI 해설·키·계좌번호는 넣지 않는다."""
-from agent.report.schema import Context, HoldingContext
+from agent.report.schema import Context, HoldingContext, SectorRow
 
 LEVEL_KEYS = [("sell2", "일부매도 2차"), ("sell1", "일부매도 1차"), ("buy1", "분할매수 1단계"),
               ("buy2", "분할매수 2단계"), ("buy3", "분할매수 3단계"), ("review", "재검토 기준가")]
@@ -15,6 +15,12 @@ def holding_levels(h: HoldingContext) -> dict[str, float]:
     if v.review is not None:
         levels["review"] = v.review
     return levels
+
+
+def _eps(r: SectorRow) -> float | None:
+    if r.method == "PER" and r.value and r.close and r.value > 0:
+        return r.close / r.value
+    return None
 
 
 def make_snapshot(ctx: Context) -> dict:
@@ -37,4 +43,5 @@ def make_snapshot(ctx: Context) -> dict:
         "market": {"indices": {k: q.close for k, q in ctx.market.indices.items()},
                    "fx_usdkrw": ctx.market.fx_usdkrw},
         "alerts": [a.model_dump() for a in ctx.alerts],
+        "sectors": {r.key: {"method": r.method, "value": r.value, "close": r.close, "eps": _eps(r)} for r in ctx.sectors},
     }

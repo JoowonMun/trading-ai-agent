@@ -50,3 +50,42 @@ def test_sort_rows_none_last():
             SectorRow(key="b", name="b", market="KR", method="PER", percentile=50.0),
             SectorRow(key="c", name="c", market="KR", method="PER", percentile=10.0)]
     assert [r.key for r in sort_rows(rows)] == ["c", "b", "a"]
+
+
+def past_snaps(n, value=20.0, eps=10.0, end=date(2026, 11, 16)):
+    return [{"date": (end - timedelta(weeks=i)).isoformat(),
+             "sectors": {"US:XLK": {"method": "PER", "value": value, "close": value * eps, "eps": eps}}}
+            for i in range(n)]
+
+
+def us(value=30.0, close=300.0):
+    return SectorRow(key="US:XLK", name="기술", market="US", method="PER", value=value, close=close)
+
+
+def test_enrich_needs_26_weeks_for_percentile():
+    from agent.analysis.sectors import enrich_us_from_history
+    row = us()
+    enrich_us_from_history([row], past_snaps(24), date(2026, 11, 23))
+    assert row.history_weeks == 25 and row.percentile is None and "26주" in row.note
+    row = us()
+    enrich_us_from_history([row], past_snaps(25), date(2026, 11, 23))
+    assert row.history_weeks == 26 and row.percentile == 100.0 and row.level == "비싸요" and row.note == ""
+
+
+def test_enrich_earnings_3m_after_13_weeks():
+    from agent.analysis.sectors import enrich_us_from_history
+    row = us()
+    enrich_us_from_history([row], past_snaps(12), date(2026, 11, 23))
+    assert row.earnings_3m_pct is None
+    row = us()
+    enrich_us_from_history([row], past_snaps(13), date(2026, 11, 23))   # 91일 전 이하 가장 가까운 기록
+    assert row.earnings_3m_pct == 0.0                                   # EPS 10 → 300/30 = 10
+
+
+def test_enrich_ignores_old_snapshots_and_kr_rows():
+    from agent.analysis.sectors import enrich_us_from_history
+    row = us()
+    kr = SectorRow(key="KR:1018", name="건설", market="KR", method="PBR", value=0.7, percentile=12.0)
+    enrich_us_from_history([row, kr], [{"date": "2026-11-16", "holdings": []}], date(2026, 11, 23))
+    assert row.history_weeks == 1 and row.percentile is None
+    assert kr.history_weeks == 0 and kr.percentile == 12.0

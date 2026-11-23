@@ -1,4 +1,6 @@
 """업종 온도계: 업종의 가격 수준(과거 대비 위치) · 이익 방향 · 주가 위치를 계산한다."""
+from datetime import date, timedelta
+
 import pandas as pd
 
 from agent.report.schema import SectorRow
@@ -70,3 +72,27 @@ def us_row(ticker: str, name: str, per: float | None, closes: pd.Series) -> Sect
 
 def sort_rows(rows: list[SectorRow]) -> list[SectorRow]:
     return sorted(rows, key=lambda r: (r.percentile is None, r.percentile or 0))
+
+
+US_PERCENTILE_WEEKS, US_EARNINGS_WEEKS = 26, 13
+
+
+def enrich_us_from_history(rows: list[SectorRow], past: list[dict], today: date) -> None:
+    """미국 업종은 과거 PER을 무료로 구할 수 없어, 매주 저장한 기록으로 과거 대비 위치·이익 방향을 채운다."""
+    cutoff = (today - timedelta(days=91)).isoformat()
+    for row in rows:
+        if row.market != "US":
+            continue
+        hist = sorted(((s["date"], s["sectors"][row.key]) for s in past if row.key in (s.get("sectors") or {})),
+                      key=lambda x: x[0])
+        row.history_weeks = len(hist) + 1
+        values = [h["value"] for _, h in hist if h.get("value")]
+        if row.value and row.history_weeks >= US_PERCENTILE_WEEKS:
+            row.percentile = percentile_of(pd.Series(values + [row.value]), row.value)
+            row.level = level_of(row.percentile)
+            row.note = ""
+        else:
+            row.note = f"기록 {row.history_weeks}주 — {US_PERCENTILE_WEEKS}주부터 과거와 비교"
+        old = [h for d, h in hist if d <= cutoff]
+        if row.value and row.close and old and old[-1].get("eps") and row.history_weeks >= US_EARNINGS_WEEKS:
+            row.earnings_3m_pct = _change(row.close / row.value, old[-1]["eps"])

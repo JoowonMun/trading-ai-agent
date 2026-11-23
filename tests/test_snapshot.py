@@ -26,3 +26,13 @@ def test_make_snapshot_contents_and_no_ai_text():
     assert snap["market"]["indices"]["KOSPI"] == 2500.0 and snap["market"]["fx_usdkrw"] == 1350.0
     assert snap["alerts"][0]["kind"] == "big_move"
     json.dumps(snap)   # 직렬화 가능
+
+
+def test_snapshot_saves_sectors():
+    from agent.report.schema import SectorRow
+    ctx = sample_context()
+    ctx.sectors = [SectorRow(key="US:XLK", name="기술", market="US", method="PER", value=25.0, close=200.0),
+                   SectorRow(key="KR:1018", name="건설", market="KR", method="PBR", value=0.7, close=100.0)]
+    assert make_snapshot(ctx)["sectors"] == {
+        "US:XLK": {"method": "PER", "value": 25.0, "close": 200.0, "eps": 8.0},
+        "KR:1018": {"method": "PBR", "value": 0.7, "close": 100.0, "eps": None}}
