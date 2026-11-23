@@ -71,3 +71,51 @@ def test_us_closes_drop_missing_values(monkeypatch):
     monkeypatch.setattr(yf, "Ticker", FakeTicker)
     closes = MarketData().us_closes("AAPL", date(2026, 10, 14), date(2026, 10, 16))
     assert closes.tolist() == [100.0, 101.0]
+
+
+def test_quiet_is_safe_across_threads(capsys):
+    import random
+    import sys
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    from agent.collectors.prices import _quiet
+
+    def chatty(i):
+        time.sleep(random.random() / 50)
+        print(f"로그인 ID: secret-{i}")
+        time.sleep(random.random() / 50)
+        return i
+
+    before = sys.stdout
+    for _ in range(5):
+        with ThreadPoolExecutor(6) as pool:
+            assert list(pool.map(lambda i: _quiet(chatty, i), range(12))) == list(range(12))
+    assert sys.stdout is before
+    print("after")
+    out = capsys.readouterr().out
+    assert "secret" not in out and "after" in out
+
+
+def test_pykrx_is_only_imported_through_quiet():
+    """pykrx는 import하는 순간 로그인하며 아이디를 출력한다 — 반드시 _krx()로만 불러온다."""
+    from pathlib import Path
+    found = [(path.name, line.strip()) for path in Path("src/agent").rglob("*.py")
+             for line in path.read_text(encoding="utf-8").splitlines() if line.strip().startswith(("from pykrx", "import pykrx"))]
+    assert found == [("prices.py", "from pykrx import stock")]          # _import_stock 한 곳뿐
+
+
+def test_krx_import_is_quiet(monkeypatch, capsys):
+    import sys
+    import types
+
+    from agent.collectors import prices
+    fake = types.ModuleType("pykrx")
+    fake.__path__ = []
+    stock = types.ModuleType("pykrx.stock")
+    fake.stock = stock
+    monkeypatch.setitem(sys.modules, "pykrx", fake)
+    monkeypatch.setitem(sys.modules, "pykrx.stock", stock)
+    monkeypatch.setattr(prices, "_import_stock", lambda: print("로그인 ID: secret") or stock)
+    assert prices._krx() is stock
+    assert "secret" not in capsys.readouterr().out

@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from agent.collectors.prices import MarketData, _quiet, _yyyymmdd
+from agent.collectors.prices import MarketData, _krx, _quiet, _yyyymmdd
 
 # (KRX 지수 코드, 이름, 가격 수준 방식) — 경기를 타는 업종·금융은 PBR
 KR_SECTORS = [
@@ -26,7 +26,7 @@ class SectorData:
     def kr_fundamentals(self, code: str, start: date, end: date) -> pd.DataFrame:
         if not (os.getenv("KRX_ID") and os.getenv("KRX_PW")):
             raise RuntimeError("KRX 계정이 없어요")
-        from pykrx import stock
+        stock = _krx()
 
         df = _quiet(stock.get_index_fundamental, _yyyymmdd(start), _yyyymmdd(end), code)
         if df is None or df.empty or not {"종가", "PER", "PBR"} <= set(df.columns):
@@ -44,18 +44,18 @@ class SectorData:
 
     def latest_trading_day(self, today: date) -> date:
         """오늘 이전 가장 최근 거래일 (KRX는 오늘 자료가 비어 있을 수 있다)."""
-        from pykrx import stock
+        stock = _krx()
 
         day = _quiet(stock.get_nearest_business_day_in_a_week, _yyyymmdd(today - timedelta(days=1)), True)
         return date(int(day[:4]), int(day[4:6]), int(day[6:]))
 
     def kr_constituents(self, code: str, day: date) -> list[str]:
-        from pykrx import stock
+        stock = _krx()
 
         return list(_quiet(stock.get_index_portfolio_deposit_file, code, _yyyymmdd(day)))
 
     def market_cap_top(self, day: date, n: int) -> list[str]:
-        from pykrx import stock
+        stock = _krx()
 
         df = _quiet(stock.get_market_cap, _yyyymmdd(day), "ALL")
         return list(df.sort_values("시가총액", ascending=False).index[:n])
