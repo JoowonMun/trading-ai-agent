@@ -25,7 +25,8 @@ from agent.report.schema import (Context, Disclosure, Flows, HoldingContext, Ind
 log = logging.getLogger(__name__)
 
 GLOSSARY_TERMS = ["PER", "PBR", "ROE", "영업이익률", "매출 성장률", "영업이익 성장률", "부채비율", "배당수익률",
-                  "이동평균선", "RSI", "52주 위치", "PER 밴드", "분할매수", "재검토 기준가", "리밸런싱"]
+                  "이동평균선", "RSI", "52주 위치", "PER 밴드", "분할매수", "재검토 기준가", "리밸런싱",
+                  "업종 온도계", "이익 방향"]
 
 
 class ContextError(RuntimeError):

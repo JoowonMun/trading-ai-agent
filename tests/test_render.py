@@ -178,3 +178,31 @@ def test_source_link_shows_real_host_not_userinfo():
         "found": True, "summary": "s", "sources": ["https://www.yna.co.kr@evil.example/x"]}})
     html = render_report(ctx, a, [])
     assert ">evil.example<" in html and ">www.yna.co.kr@evil.example<" not in html
+
+
+def sector_ctx():
+    from agent.report.schema import SectorRow
+    ctx = sample_context()
+    ctx.sectors = [SectorRow(key="US:XLK", name="기술", market="US", method="PER", value=26.3, history_weeks=3,
+                             note="기록 3주 — 26주부터 과거와 비교", drawdown_52w_pct=-27.0),
+                   SectorRow(key="KR:1013", name="전기전자", market="KR", method="PER", value=9.1, percentile=55.0,
+                             level="보통"),
+                   SectorRow(key="KR:1018", name="건설", market="KR", method="PBR", value=0.68, percentile=12.0,
+                             level="싸요", earnings_1y_pct=-45.0, drawdown_52w_pct=-30.0, return_3m_pct=-8.0)]
+    ctx.sectors_missing = ["국내 업종 증권: boom"]
+    return ctx
+
+
+def test_sector_section_in_weekly():
+    from agent.report.glossary import GLOSSARY_SHORT
+    html = render_report(sector_ctx(), None, [])
+    assert "업종 온도계" in html and "PBR 0.68배" in html and "하위 12%" in html and "싸요" in html
+    assert "-45.0%" in html and "기록 3주" in html and "증권: boom" in html and GLOSSARY_SHORT["이익 방향"] in html
+    assert html.index("건설") < html.index("전기전자")          # 싼 업종이 위
+
+
+def test_sector_section_only_in_weekly_with_rows():
+    ctx = sector_ctx()
+    ctx.report_type = "alert"
+    assert "업종 온도계" not in render_report(ctx, None, [])
+    assert "업종 온도계" not in render_report(sample_context(), None, [])

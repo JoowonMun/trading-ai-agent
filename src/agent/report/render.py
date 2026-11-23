@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from agent.analysis.sectors import sort_rows
 from agent.report.glossary import GLOSSARY, GLOSSARY_SHORT
 from agent.report.schema import Analysis, Context, HoldingContext
 
@@ -87,6 +88,8 @@ def render_report(context: Context, analysis: Analysis | None, notes: list[str])
         alerts_by_ticker=alerts_by_ticker,
         holdings_by_ticker={h.ticker: h for h in context.holdings},
         context=context,
+        sectors_kr=sort_rows([r for r in context.sectors if r.market == "KR"]),
+        sectors_us=sort_rows([r for r in context.sectors if r.market == "US"]),
         analysis=analysis,
         analyses={h.ticker: h for h in analysis.holdings} if analysis else {},
         summary=analysis.summary if analysis else auto_summary(context),

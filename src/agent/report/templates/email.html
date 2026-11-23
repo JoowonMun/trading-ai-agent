@@ -57,6 +57,26 @@
 {% endif %}
 {% endif %}
 
+{% if context.sectors %}
+<h2 style="{{ H2 }}">🌡️ 업종 온도계 <span style="font-size:13px;color:#78716c;font-weight:normal;">지금 어느 업종이 과거보다 싸고 비싼가</span></h2>
+{% for label, rows, earn in [("국내", sectors_kr, "1y"), ("미국", sectors_us, "3m")] %}{% if rows %}
+<div style="font-size:13px;font-weight:600;margin:12px 0 4px;">{{ label }}</div>
+<table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px;">
+<tr><th style="{{ TH }}text-align:left;">업종</th><th style="{{ TH }}text-align:left;">가격 수준</th><th style="{{ TH }}text-align:right;">이익 방향({{ "1년" if earn == "1y" else "3개월" }})</th><th style="{{ TH }}text-align:right;">고점 대비</th><th style="{{ TH }}text-align:right;">3개월</th></tr>
+{% for r in rows %}{% set e = r.earnings_1y_pct if earn == "1y" else r.earnings_3m_pct %}
+<tr><td style="{{ TD }}white-space:nowrap;">{{ r.name }}</td>
+<td style="{{ TD }}">{% if r.value is not none %}{{ r.method }} {{ r.value|num(2) }}배{% else %}-{% endif %}{% if r.percentile is not none %} · 하위 {{ r.percentile|num(0) }}% <span style="font-weight:600;color:{{ '#15803d' if r.level == '싸요' else '#b91c1c' if r.level == '비싸요' else '#57534e' }};">{{ r.level }}</span>{% else %} <span style="color:#78716c;">({{ r.note or "과거 기록 쌓는 중" }})</span>{% endif %}</td>
+<td style="{{ TD }}text-align:right;color:{{ '#15803d' if (e or 0) > 0 else '#b91c1c' if (e or 0) < 0 else '#57534e' }};">{{ "%+.1f"|format(e) ~ "%" if e is not none else "-" }}</td>
+<td style="{{ TD }}text-align:right;">{{ "%+.1f"|format(r.drawdown_52w_pct) ~ "%" if r.drawdown_52w_pct is not none else "-" }}</td>
+<td style="{{ TD }}text-align:right;">{{ "%+.1f"|format(r.return_3m_pct) ~ "%" if r.return_3m_pct is not none else "-" }}</td></tr>
+{% endfor %}
+</table>
+{% endif %}{% endfor %}
+<p style="font-size:13px;color:#57534e;margin:8px 0 0;">읽는 법: <strong>가격 수준</strong>은 지금 PER·PBR이 과거 5년 중 어디쯤인지예요(하위 30% 이하 "싸요"). 화학·건설·금융처럼 경기를 타는 업종은 PBR로 봐요.
+<strong>이익 방향</strong>은 {{ glossary_short["이익 방향"] }}. 싸고 이익이 늘기 시작한 업종이 가장 눈여겨볼 곳이에요. 싸도 이익이 계속 줄면 더 싸질 수 있어요.</p>
+{% if context.sectors_missing %}<p style="font-size:12px;color:#a8a29e;margin:4px 0 0;">누락: {{ context.sectors_missing|join(" · ") }}</p>{% endif %}
+{% endif %}
+
 {% if context.market.indices or context.market.fx_usdkrw %}
 <h2 style="{{ H2 }}">시장</h2>
 <table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px;">
