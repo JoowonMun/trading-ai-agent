@@ -144,3 +144,11 @@ def test_nps_us_failure_noted():
                         sec=FakeSec(fail=True))
     assert ctx.nps_us is None
     assert any(m.startswith("국민연금 미국 보유") for m in ctx.market.missing)
+
+
+def test_build_context_with_sectors():
+    from test_sectors import FakeSectors
+    ctx = build_context(Settings(), holdings(), FakeMarket(), FakeDart(TODAY), TODAY, us=FakeUs(TODAY),
+                        sectors=FakeSectors())
+    assert len(ctx.sectors) == 29 and ctx.sectors_missing == []
+    assert build().sectors == []

@@ -17,6 +17,7 @@ from agent.collectors.dart import DartClient
 from agent.collectors.nh import NhClient
 from agent.collectors.nps import NpsClient
 from agent.collectors.prices import MarketData
+from agent.collectors.sectors import SectorData
 from agent.collectors.sec13f import Nps13fClient
 from agent.collectors.us_fundamentals import YahooFundamentals
 from agent.config import Holdings, Settings, combine_holdings, load_holdings, load_settings, today_kst
@@ -90,8 +91,9 @@ def cmd_collect(args) -> Path:
     dart = DartClient(os.environ["DART_API_KEY"], cache_dir=Path(".cache/dart"), today=args.date)
     nps = NpsClient(os.environ["DART_API_KEY"], cache_dir=Path(".cache/dart"), today=args.date)
     sec = Nps13fClient(Path(".cache/dart"))
+    sectors = SectorData() if args.date.weekday() == 0 else None  # 업종 온도계는 월요일 주간 리포트에만
     context = build_context(settings, holdings, MarketData(), dart, args.date, us=YahooFundamentals(), nps=nps,
-                            sec=sec)
+                            sec=sec, sectors=sectors)
     context.notes = notes
     if args.history_dir:
         apply_history(context, settings, SnapshotStore(args.history_dir), args.date)

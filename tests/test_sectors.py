@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 import pandas as pd
+import pytest
 
 from agent.analysis.sectors import kr_row, level_of, price_position, sort_rows, us_row
 from agent.report.schema import SectorRow
@@ -89,3 +90,77 @@ def test_enrich_ignores_old_snapshots_and_kr_rows():
     enrich_us_from_history([row, kr], [{"date": "2026-11-16", "holdings": []}], date(2026, 11, 23))
     assert row.history_weeks == 1 and row.percentile is None
     assert kr.history_weeks == 0 and kr.percentile == 12.0
+
+
+class FakeSectors:
+    def __init__(self, fail=(), krx=True):
+        self.fail, self.krx = set(fail), krx
+
+    def kr_fundamentals(self, code, start, end):
+        if not self.krx:
+            raise RuntimeError("KRX 계정이 없어요")
+        if code in self.fail:
+            raise RuntimeError("boom")
+        return frame([10.0] * 300)
+
+    def us_quote(self, ticker, today):
+        if ticker in self.fail:
+            raise RuntimeError("boom")
+        return 20.0, pd.Series([1.0, 1.0], index=pd.bdate_range("2026-11-19", periods=2))
+
+
+def test_sector_lists_match_spec():
+    from agent.collectors.sectors import KR_SECTORS, US_SECTORS
+    assert len(KR_SECTORS) == 17 and len(US_SECTORS) == 12
+    pbr = {name for _, name, method in KR_SECTORS if method == "PBR"}
+    assert pbr == {"화학", "금속", "건설", "기계·장비", "운송장비·부품", "운송·창고", "금융", "증권", "보험"}
+    assert ("1018", "건설", "PBR") in KR_SECTORS and ("SOXX", "반도체") in US_SECTORS
+
+
+def test_attach_sectors_one_failure_only_drops_that_row():
+    from agent.report.context import _attach_sectors
+    rows, missing = _attach_sectors(FakeSectors(fail={"1018", "XLE"}), date(2026, 11, 23))
+    assert len(rows) == 17 + 12 - 2 and len(missing) == 2 and any("건설" in m for m in missing)
+
+
+def test_attach_sectors_without_krx():
+    from agent.report.context import _attach_sectors
+    rows, missing = _attach_sectors(FakeSectors(krx=False), date(2026, 11, 23))
+    assert {r.market for r in rows} == {"US"} and missing == ["국내 업종: KRX 계정이 없어요"]
+
+
+def test_collect_passes_sectors_only_on_monday(monkeypatch, tmp_path):
+    import agent.__main__ as cli
+    from agent.collectors.sectors import SectorData
+    seen = []
+
+    class Stop(Exception):
+        pass
+
+    def fake_build(*args, **kwargs):
+        seen.append(kwargs.get("sectors"))
+        raise Stop
+
+    monkeypatch.setenv("DART_API_KEY", "x")
+    monkeypatch.setattr(cli, "load_holdings", lambda path: None)
+    monkeypatch.setattr(cli, "resolve_holdings", lambda settings, manual, notes: manual)
+    monkeypatch.setattr(cli, "build_context", fake_build)
+    config = tmp_path / "config"
+    config.mkdir()
+    (config / "settings.yaml").write_text("profile:\n  name: balanced\n", encoding="utf-8")
+    for day in ("2026-11-23", "2026-11-24"):
+        try:
+            cli.main(["collect", "--date", day, "--out", str(tmp_path / "out"), "--config-dir", str(config)])
+        except Stop:
+            pass
+    assert isinstance(seen[0], SectorData) and seen[1] is None
+
+
+@pytest.mark.live
+def test_live_sector_data():
+    from agent.collectors.sectors import SectorData
+    today = date.today()
+    df = SectorData().kr_fundamentals("1018", today - timedelta(days=365 * 5), today)
+    assert len(df) >= 1000 and set(df.columns) >= {"close", "per", "pbr"}
+    per, closes = SectorData().us_quote("XLK", today)
+    assert per and per > 0 and len(closes) > 200

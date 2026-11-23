@@ -14,11 +14,13 @@ from agent.analysis.signals import decide_signal
 from agent.analysis.valuation import (band_valuation, choose_method, earnings_points, is_financial,
                                       multiples_from_points)
 from agent.collectors.common import NotACompany
+from agent.analysis.sectors import kr_row, us_row
 from agent.collectors.dart import disclosure_url
+from agent.collectors.sectors import KR_SECTORS, US_SECTORS
 from agent.collectors.sec13f import normalize_issuer
 from agent.config import Holdings, Settings
 from agent.report.schema import (Context, Disclosure, Flows, HoldingContext, IndexQuote, Market, PositionInfo,
-                                 PriceSnapshot)
+                                 PriceSnapshot, SectorRow)
 
 log = logging.getLogger(__name__)
 
@@ -176,8 +178,31 @@ def _attach_nps_us(sec, holdings: list[HoldingContext], us_names: dict, market_i
     return {k: v for k, v in report.items() if k not in ("positions", "tickers", "names")}
 
 
+def _attach_sectors(source, today: date) -> tuple[list[SectorRow], list[str]]:
+    """업종 온도계. 업종 하나가 실패하면 그 업종만 빠진다. KRX 계정이 없으면 국내 전체를 한 줄로 누락 표시."""
+    rows: list[SectorRow] = []
+    missing: list[str] = []
+    start = today - timedelta(days=365 * 5)
+    for code, name, method in KR_SECTORS:
+        try:
+            rows.append(kr_row(code, name, method, source.kr_fundamentals(code, start, today)))
+        except Exception as e:
+            if "KRX 계정" in str(e):
+                missing.append(f"국내 업종: {e}")
+                break
+            missing.append(f"국내 업종 {name}: {str(e).splitlines()[0]}")
+    for ticker, name in US_SECTORS:
+        try:
+            per, closes = source.us_quote(ticker, today)
+            rows.append(us_row(ticker, name, per, closes))
+        except Exception as e:
+            missing.append(f"미국 업종 {name}: {str(e).splitlines()[0]}")
+    log.info("업종 온도계 %d개 (누락 %d)", len(rows), len(missing))
+    return rows, missing
+
+
 def build_context(settings: Settings, holdings: Holdings, market, dart, today: date, us=None, nps=None,
-                  sec=None) -> Context:
+                  sec=None, sectors=None) -> Context:
     market_info = _market(market, today)
     log.info("시장 지표 수집 완료")
     positions = aggregate_positions(holdings)
@@ -236,6 +261,12 @@ def build_context(settings: Settings, holdings: Holdings, market, dart, today: d
         log.info("국민연금 미국 보유(13F) 수집")
         nps_us = _attach_nps_us(sec, holding_contexts, us_names, market_info)
 
+    sector_rows, sectors_missing = ([], [])
+    if sectors is not None:
+        log.info("업종 온도계 수집")
+        sector_rows, sectors_missing = _attach_sectors(sectors, today)
+
     return Context(date=today.isoformat(), profile=settings.profile, market=market_info,
                    holdings=holding_contexts, portfolio=portfolio, glossary_terms=GLOSSARY_TERMS,
-                   nps_changes=nps_changes, nps_annual_as_of=nps_as_of, nps_us=nps_us)
+                   nps_changes=nps_changes, nps_annual_as_of=nps_as_of, nps_us=nps_us,
+                   sectors=sector_rows, sectors_missing=sectors_missing)
