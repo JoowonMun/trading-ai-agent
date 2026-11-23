@@ -130,3 +130,10 @@ def test_attach_signals_dart_failure():
     signals, _, missing, _ = _attach_signals(FakeDartMarket(fail=True), FakeSource(), SECTORS, set(),
                                              date(2026, 11, 23))
     assert signals == [] and missing == ["조용한 신호: DART 다운"]
+
+
+def test_promising_signals_grouped_by_sector():
+    filings = [filing("000001", CONTRACT, "20261120"), filing("000002", CONTRACT, "20261119"),
+               filing("000003", "자기주식취득결정", "20261118")]
+    signals, _ = pick_signals(filings, set(), {"000001": "유통", "000002": "금속", "000003": "유통"}, set())
+    assert [s.sector for s in signals] == ["유통", "유통", "금속"]      # 최근 신호가 있는 업종부터, 업종끼리 묶음

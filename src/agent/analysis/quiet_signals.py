@@ -52,5 +52,8 @@ def pick_signals(filings: list[dict], holdings: set[str], members: dict[str, str
                                   sector=members.get(ticker) if group == "promising" else None,
                                   why=WHY[kind], caution=kind in CAUTION))
     picked.sort(key=lambda s: s.date, reverse=True)
-    picked.sort(key=lambda s: GROUP_ORDER.index(s.group))
+    first_seen: dict[str | None, int] = {}  # 유망 업종은 최근 신호가 있는 업종부터, 업종끼리 묶는다
+    for s in picked:
+        first_seen.setdefault(s.sector, len(first_seen))
+    picked.sort(key=lambda s: (GROUP_ORDER.index(s.group), first_seen[s.sector]))
     return picked[:limit], max(0, len(picked) - limit)
