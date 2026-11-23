@@ -66,9 +66,9 @@ gh workflow run daily-report.yml -f dry_run=true   # Actions 점검 실행
 ## 4. 구조
 
 ```
-src/agent/collectors/  dart · nh(잔고, 조회 전용) · prices · us_fundamentals · nps · sec13f(13f.info)
+src/agent/collectors/  dart · nh(잔고, 조회 전용) · prices · us_fundamentals · nps · sec13f(13f.info) · sectors(업종 지수·ETF)
 src/agent/analysis/    financials · fundamentals · valuation · signals · assessment · portfolio
-                       · disclosures · indicators · alerts · weekly · research
+                       · disclosures · indicators · alerts · weekly · research · sectors(업종 온도계)
 src/agent/history/     snapshot · store (비공개 기록 저장소)
 src/agent/report/      context(오케스트레이션) · schema · validate · render · templates/{email,alert}.html · glossary
 src/agent/__main__.py  CLI
