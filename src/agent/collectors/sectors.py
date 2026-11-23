@@ -46,8 +46,14 @@ class SectorData:
         """오늘 이전 가장 최근 거래일 (KRX는 오늘 자료가 비어 있을 수 있다)."""
         stock = _krx()
 
-        day = _quiet(stock.get_nearest_business_day_in_a_week, _yyyymmdd(today - timedelta(days=1)), True)
-        return date(int(day[:4]), int(day[4:6]), int(day[6:]))
+        try:
+            day = _quiet(stock.get_nearest_business_day_in_a_week, _yyyymmdd(today - timedelta(days=1)), True)
+            return date(int(day[:4]), int(day[4:6]), int(day[6:]))
+        except Exception:  # KRX가 가끔 빈 응답을 준다 → 직전 평일 (휴일이어도 시총은 직전 자료가 온다)
+            day = today - timedelta(days=1)
+            while day.weekday() >= 5:
+                day -= timedelta(days=1)
+            return day
 
     def kr_constituents(self, code: str, day: date) -> list[str]:
         stock = _krx()

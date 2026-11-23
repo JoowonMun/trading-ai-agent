@@ -262,3 +262,16 @@ def test_live_signal_sources():
     assert len(s.kr_constituents("1011", day)) > 10 and len(s.market_cap_top(day, 300)) == 300
     dart = DartClient(os.environ["DART_API_KEY"], Path(".cache/dart"), today=today)
     assert len(dart.market_disclosures(today - timedelta(days=7), today - timedelta(days=1))) > 0
+
+
+def test_latest_trading_day_falls_back_to_previous_weekday(monkeypatch):
+    from pykrx import stock
+
+    from agent.collectors.sectors import SectorData
+
+    def broken(date, prev=True):
+        raise IndexError("index -1 is out of bounds")
+
+    monkeypatch.setattr(stock, "get_nearest_business_day_in_a_week", broken)
+    assert SectorData().latest_trading_day(date(2026, 11, 23)) == date(2026, 11, 20)   # 월 → 금
+    assert SectorData().latest_trading_day(date(2026, 11, 25)) == date(2026, 11, 24)   # 수 → 화
