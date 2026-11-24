@@ -52,13 +52,14 @@ def test_pick_candidates_empty_when_no_data():
 
 
 def test_kr_fundamentals_all_and_ticker_name(monkeypatch):
-    from pykrx import stock
+    from types import SimpleNamespace
 
+    import agent.collectors.sectors as sectors
     from agent.collectors.sectors import SectorData
     raw = pd.DataFrame({"BPS": [1.0], "PER": [8.0], "PBR": [0.5], "EPS": [1.0], "DIV": [2.0], "DPS": [1.0]},
                        index=["000001"])
-    monkeypatch.setattr(stock, "get_market_fundamental", lambda day, market: raw)
-    monkeypatch.setattr(stock, "get_market_ticker_name", lambda t: "가짜제철")
+    fake = SimpleNamespace(get_market_fundamental=lambda day, market: raw, get_market_ticker_name=lambda t: "가짜제철")
+    monkeypatch.setattr(sectors, "_krx", lambda: fake)   # 실제 pykrx를 불러오면 KRX에 로그인한다
     df = SectorData().kr_fundamentals_all(date(2026, 11, 20))
     assert list(df.columns) == ["per", "pbr"] and df.loc["000001", "pbr"] == 0.5
     assert SectorData().ticker_name("000001") == "가짜제철"

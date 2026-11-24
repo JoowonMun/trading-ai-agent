@@ -29,7 +29,8 @@ def build_opinion_prompt(guide: str, context: Context, news: NewsReport | None) 
         r = rows.get(name)
         picks = ", ".join(c.name for c in context.candidates if c.sector == name) or "없음"
         state = f"{r.method} {r.level}, 이익 {'늘고' if (r.earnings_1y_pct or 0) > 0 else '줄고'} 있음" if r else ""
-        lines.append(f"- {name}: {state} · 후보 회사: {picks}")
+        warning = f" · 주의: {r.note}" if r and r.note else ""
+        lines.append(f"- {name}: {state} · 후보 회사: {picks}{warning}")
     lines += ["", "## 테마", *(f"- {t}" for t in themes)]
     lines += ["", "## 읽어볼 뉴스 (번호)"]
     lines += [f"{n}. {i.title} — {i.source} ({i.date}) [{g.name}] {i.url}" for n, g, i in numbered_news(news)]

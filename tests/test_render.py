@@ -297,3 +297,22 @@ def test_opinion_section_absent_without_sectors_or_in_alert():
     ctx = opinion_ctx()
     ctx.report_type = "alert"
     assert "이번 주 살펴볼 곳" not in render_report(ctx, None, [])
+
+
+def test_opinion_section_with_ai_text():
+    from agent.report.schema import Opinions, SectorOpinion, ThemeOpinion
+    ops = Opinions(sectors={"금속": SectorOpinion(up="수요 <회복> 전망이에요", down="수입품이 늘 수 있어요",
+                                                 watch="다음 분기 실적", sources=["https://news.example/a"])},
+                   themes={"원전": ThemeOpinion(view="해외 수주 기대가 이어져요", sources=["https://x.example/b"])})
+    html = render_report(opinion_ctx(), None, [], opinions=ops)
+    assert "오를 수 있는 이유:</strong> 수요 &lt;회복&gt; 전망이에요" in html
+    assert "안 오를 수 있는 이유:</strong> 수입품이 늘 수 있어요" in html and "확인할 것:</strong> 다음 분기 실적" in html
+    assert 'href="https://news.example/a"' in html and "[테마 · 원전]</strong> 해외 수주 기대가 이어져요" in html
+
+
+def test_opinion_card_shows_sector_warning():
+    ctx = opinion_ctx()
+    ctx.sectors[2].note = "경기 정점일 수 있어요"
+    html = render_report(ctx, None, [])
+    card = html[html.index("이번 주 살펴볼 곳"):html.index("한눈에 보기")]
+    assert "⚠ 경기 정점일 수 있어요" in card

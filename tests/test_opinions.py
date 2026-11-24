@@ -94,3 +94,9 @@ def test_check_ignores_non_dict_input():
 def test_drop_news_removes_items_and_empty_groups():
     kept = drop_news(news(), [3, 1])
     assert [(g.name, [i.title for i in g.items]) for g in kept.groups] == [("금속", ["철강B"])]
+
+
+def test_prompt_carries_sector_warning():
+    c = ctx()
+    c.sectors[0].note = "이익이 급증한 업종은 경기 정점일 수 있어요"
+    assert "주의: 이익이 급증한 업종은 경기 정점일 수 있어요" in build_opinion_prompt("지침", c, None)

@@ -49,7 +49,7 @@ def test_secrets_are_scoped_to_steps_and_ai_gets_only_its_token():
     job, steps = _steps()
     assert not any("secrets." in str(v) for v in job.get("env", {}).values())
     for name, step in steps.items():
-        if "AI" in name or "원인 조사" in name:
+        if "AI" in name or "원인 조사" in name or "업종 의견" in name:
             secrets = [v for v in step.get("env", {}).values() if "secrets." in str(v)]
             assert secrets == ["${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"], name
 
@@ -61,3 +61,14 @@ def test_research_agent_has_only_web_tools_and_writer_has_no_web():
     assert '--tools "WebSearch,WebFetch"' in research and "Write" not in research
     assert "WebSearch" not in writer and "WebFetch" not in writer
     assert "timeout 600" in research and "timeout 600" in writer
+
+
+def test_opinion_agent_has_only_web_tools_and_runs_on_weekly():
+    _, steps = _steps()
+    name, step = next((n, s) for n, s in steps.items() if "업종 의견" in n)
+    run = step["run"]
+    assert '--tools "WebSearch,WebFetch"' in run and "Write" not in run and "timeout 600" in run
+    assert "opinion-prompt" in run and "opinion-save" in run
+    assert step.get("continue-on-error") is True and "weekly" in step["if"]
+    names = list(steps)
+    assert names.index(name) < next(i for i, n in enumerate(names) if "AI 해설" in n)
