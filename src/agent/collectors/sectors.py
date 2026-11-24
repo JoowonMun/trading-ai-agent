@@ -65,3 +65,17 @@ class SectorData:
 
         df = _quiet(stock.get_market_cap, _yyyymmdd(day), "ALL")
         return list(df.sort_values("시가총액", ascending=False).index[:n])
+
+    def kr_fundamentals_all(self, day: date) -> pd.DataFrame:
+        """전 종목 PER·PBR (한 번에 받는다)."""
+        stock = _krx()
+
+        df = _quiet(stock.get_market_fundamental, _yyyymmdd(day), "ALL")
+        if df is None or df.empty or not {"PER", "PBR"} <= set(df.columns):
+            raise RuntimeError("종목 지표를 가져오지 못했어요")
+        return df[["PER", "PBR"]].astype(float).rename(columns={"PER": "per", "PBR": "pbr"})
+
+    def ticker_name(self, ticker: str) -> str:
+        stock = _krx()
+
+        return str(_quiet(stock.get_market_ticker_name, ticker))

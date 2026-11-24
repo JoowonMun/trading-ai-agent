@@ -196,6 +196,17 @@ class QuietSignal(BaseModel):
     caution: bool = False
 
 
+class Candidate(BaseModel):
+    """살펴볼 곳 후보 회사 (코드가 고름): 시총 상위 300 · 흑자 · 업종 중간값보다 쌈."""
+    ticker: str
+    name: str
+    sector: str
+    method: Literal["PER", "PBR"]
+    value: float
+    sector_median: float
+    held: bool = False
+
+
 class NewsItem(BaseModel):
     title: str
     source: str
