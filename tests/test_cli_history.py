@@ -84,6 +84,7 @@ def test_save_snapshot(tmp_path):
     cli.main(publish_args(tmp_path, config, "save-snapshot", "--history-dir", str(tmp_path / "data")))
     saved = json.loads((tmp_path / "data" / "snapshots" / "2026-10-15.json").read_text(encoding="utf-8"))
     assert saved["date"] == "2026-10-15"
+    assert not (tmp_path / "data" / "opinions").exists()
 
 
 def test_apply_history_corrupt_older_snapshot_treated_as_first_run(tmp_path):
@@ -206,3 +207,13 @@ def test_publish_renders_opinions_and_drops_news(tmp_path, monkeypatch):
     html = (day / "preview.html").read_text(encoding="utf-8")
     assert "수요가 회복된다는 전망이에요" in html
     assert "철강 업황 소식" not in html and "원전 소식" in html   # 1번 기사만 뺀다
+
+
+def test_save_snapshot_copies_opinions(tmp_path):
+    config, day = opinion_day(tmp_path)
+    (day / "opinions.json").write_text(json.dumps(OPINION, ensure_ascii=False), encoding="utf-8")
+    cli.main(publish_args(tmp_path, config, "save-snapshot", "--history-dir", str(tmp_path / "data")))
+    copied = tmp_path / "data" / "opinions" / "2026-10-15.json"
+    assert json.loads(copied.read_text(encoding="utf-8")) == OPINION
+    saved = json.loads((tmp_path / "data" / "snapshots" / "2026-10-15.json").read_text(encoding="utf-8"))
+    assert saved["picks"]["sectors"] == ["금속"] and "수요가 회복" not in json.dumps(saved, ensure_ascii=False)

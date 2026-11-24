@@ -263,9 +263,16 @@ def cmd_save_snapshot(args) -> None:
     """발송이 끝난 뒤 오늘 스냅샷을 기록 저장소 폴더에 쓴다 (커밋·푸시는 워크플로가 한다)."""
     if not args.history_dir:
         raise SystemExit("--history-dir가 필요합니다")
-    context = Context.model_validate_json((_day_dir(args) / "context.json").read_text(encoding="utf-8"))
+    day = _day_dir(args)
+    context = Context.model_validate_json((day / "context.json").read_text(encoding="utf-8"))
     SnapshotStore(args.history_dir).save(make_snapshot(context))
     log.info("스냅샷 저장: %s", context.date)
+    opinions = day / "opinions.json"
+    if opinions.exists():  # 검증 통과한 AI 의견 — 스냅샷과 따로 둔다 (가설 채점 때 다시 읽는다)
+        target = Path(args.history_dir) / "opinions" / f"{context.date}.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(opinions.read_text(encoding="utf-8"), encoding="utf-8")
+        log.info("업종 의견 기록 저장")
 
 
 def _notify_on_error(step):

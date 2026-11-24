@@ -36,3 +36,14 @@ def test_snapshot_saves_sectors():
     assert make_snapshot(ctx)["sectors"] == {
         "US:XLK": {"method": "PER", "value": 25.0, "close": 200.0, "eps": 8.0},
         "KR:1018": {"method": "PBR", "value": 0.7, "close": 100.0, "eps": None}}
+
+
+def test_snapshot_saves_picks_without_held():
+    from agent.report.schema import Candidate
+    assert make_snapshot(sample_context())["picks"] == {"sectors": [], "candidates": []}
+    ctx = sample_context()
+    ctx.opinion_sectors = ["금속"]
+    ctx.candidates = [Candidate(ticker="000001", name="가짜제철", sector="금속", method="PBR", value=0.4,
+                                sector_median=0.85, held=True)]
+    assert make_snapshot(ctx)["picks"] == {"sectors": ["금속"], "candidates": [
+        {"ticker": "000001", "name": "가짜제철", "sector": "금속", "method": "PBR", "value": 0.4, "sector_median": 0.85}]}

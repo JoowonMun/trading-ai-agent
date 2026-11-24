@@ -44,4 +44,6 @@ def make_snapshot(ctx: Context) -> dict:
                    "fx_usdkrw": ctx.market.fx_usdkrw},
         "alerts": [a.model_dump() for a in ctx.alerts],
         "sectors": {r.key: {"method": r.method, "value": r.value, "close": r.close, "eps": _eps(r)} for r in ctx.sectors},
+        "picks": {"sectors": ctx.opinion_sectors,  # 살펴볼 곳 (가설 채점용, 보유 여부는 holdings로 안다)
+                  "candidates": [c.model_dump(exclude={"held"}) for c in ctx.candidates]},
     }
