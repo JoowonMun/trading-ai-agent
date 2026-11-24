@@ -207,6 +207,25 @@ class Candidate(BaseModel):
     held: bool = False
 
 
+class SectorOpinion(BaseModel):
+    up: str
+    down: str
+    watch: str
+    sources: list[str] = []
+
+
+class ThemeOpinion(BaseModel):
+    view: str
+    sources: list[str] = []
+
+
+class Opinions(BaseModel):
+    """웹 전용 AI가 쓰고 코드가 검증한 의견 (opinions.json, 해설 AI는 읽지 않는다)."""
+    sectors: dict[str, SectorOpinion] = {}
+    themes: dict[str, ThemeOpinion] = {}
+    drop_news: list[int] = []
+
+
 class NewsItem(BaseModel):
     title: str
     source: str
@@ -249,6 +268,9 @@ class Context(BaseModel):
     signals_more: int = 0
     signals_missing: list[str] = []
     promising_sectors: list[str] = []
+    opinion_sectors: list[str] = []  # 살펴볼 곳 업종 (월요일, 유망 업종 중 싼 순 최대 3개)
+    candidates: list[Candidate] = []
+    candidates_missing: list[str] = []
 
 
 class MoveReason(BaseModel):

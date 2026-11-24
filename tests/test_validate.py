@@ -181,3 +181,13 @@ def test_sector_numbers_allowed_in_market_comment():
     assert validate_analysis(raw, ctx)[1] == []
     raw["market_comment"] = "건설 업종 PBR 0.55배예요"
     assert validate_analysis(raw, ctx)[1] != []
+
+
+def test_candidate_numbers_allowed():
+    from agent.report.schema import Candidate
+    ctx = sample_context()
+    ctx.candidates = [Candidate(ticker="000001", name="가짜제철", sector="금속", method="PBR", value=0.4,
+                                sector_median=0.85)]
+    raw = analysis()
+    raw["market_comment"] = "가짜제철은 PBR 0.4배로 업종 중간 0.85배보다 낮아요"
+    assert validate_analysis(raw, ctx)[1] == []

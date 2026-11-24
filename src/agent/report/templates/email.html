@@ -17,6 +17,19 @@
 <h2 style="{{ H2 }}">오늘의 요약</h2>
 <ul style="margin:0;padding-left:20px;">{% for line in summary %}<li style="margin:4px 0;">{{ line }}</li>{% endfor %}</ul>
 
+{% if opinion_rows %}
+<h2 style="{{ H2 }}">💡 이번 주 살펴볼 곳 <span style="font-size:13px;color:#78716c;font-weight:normal;">코드가 고른 후보와 AI 의견이에요. 사라는 뜻이 아니에요.</span></h2>
+{% for r in opinion_rows %}{% set picks = context.candidates|selectattr("sector", "equalto", r.name)|list %}
+<div style="border:1px solid #e7e5e4;border-radius:8px;padding:12px;margin:0 0 10px;font-size:13px;">
+<div style="font-weight:600;margin-bottom:4px;">[{{ r.name }}] {{ r.method }} {{ r.level }}{% if r.percentile is not none %} ({% if r.percentile <= 50 %}하위 {{ r.percentile|num(0) }}%{% else %}상위 {{ (100 - r.percentile)|num(0) }}%{% endif %}){% endif %}{% if r.earnings_1y_pct is not none %} · 이익 {% if r.earnings_1y_pct > 200 %}+200% 넘게{% else %}{{ "%+.1f"|format(r.earnings_1y_pct) }}%{% endif %}{% endif %}</div>
+{% if picks %}<div>후보: {% for c in picks %}<strong>{{ c.name }}</strong> {{ c.ticker }} · {{ c.method }} {{ c.value|num(2) }} (업종 중간 {{ c.sector_median|num(2) }}){% if c.held %} · 보유 중{% endif %}{% if not loop.last %} &nbsp;|&nbsp; {% endif %}{% endfor %}</div>
+{% else %}<div style="color:#78716c;">후보: 기준에 맞는 회사가 없어요</div>{% endif %}
+</div>
+{% endfor %}
+<p style="font-size:12px;color:#78716c;margin:4px 0 0;">후보 기준: 시가총액 상위 300 · 흑자 · 같은 업종 회사들의 중간값보다 싼 곳, 시가총액 큰 순.</p>
+{% if context.candidates_missing %}<p style="font-size:12px;color:#a8a29e;margin:4px 0 0;">누락: {{ context.candidates_missing|join(" · ") }}</p>{% endif %}
+{% endif %}
+
 <h2 style="{{ H2 }}">한눈에 보기</h2>
 <table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px;">
 <tr><th style="{{ TH }}text-align:left;">종목</th><th style="{{ TH }}">판단</th><th style="{{ TH }}text-align:right;">현재가</th><th style="{{ TH }}text-align:right;">분할매수 1단계</th><th style="{{ TH }}text-align:right;">일부매도 1차</th><th style="{{ TH }}text-align:right;">비중</th></tr>

@@ -62,3 +62,46 @@ def test_kr_fundamentals_all_and_ticker_name(monkeypatch):
     df = SectorData().kr_fundamentals_all(date(2026, 11, 20))
     assert list(df.columns) == ["per", "pbr"] and df.loc["000001", "pbr"] == 0.5
     assert SectorData().ticker_name("000001") == "가짜제철"
+
+
+class FakeKrx:
+    def __init__(self, fail_fund=False):
+        self.fail_fund = fail_fund
+
+    def latest_trading_day(self, today):
+        return date(2026, 11, 20)
+
+    def kr_constituents(self, code, day):
+        return list(FUND.index) if code == "금속" else []
+
+    def market_cap_top(self, day, n):
+        assert n == 300
+        return ["000001", "000002"]
+
+    def kr_fundamentals_all(self, day):
+        if self.fail_fund:
+            raise RuntimeError("KRX 오류\n자세히")
+        return FUND
+
+    def ticker_name(self, ticker):
+        return NAMES[ticker]
+
+
+def test_attach_candidates_for_opinion_sectors():
+    from agent.report.context import _attach_candidates
+    rows = [row("금속", 5), row("건설", 50, level="비싸요")]
+    candidates, names, missing = _attach_candidates(FakeKrx(), rows, {"000001"}, date(2026, 11, 23))
+    assert names == ["금속"] and missing == []
+    assert [(c.ticker, c.held) for c in candidates] == [("000001", True)]
+
+
+def test_attach_candidates_krx_failure_is_missing():
+    from agent.report.context import _attach_candidates
+    candidates, names, missing = _attach_candidates(FakeKrx(fail_fund=True), [row("금속", 5)], set(),
+                                                    date(2026, 11, 23))
+    assert candidates == [] and names == ["금속"] and missing == ["후보 회사: KRX 오류"]
+
+
+def test_attach_candidates_without_promising():
+    from agent.report.context import _attach_candidates
+    assert _attach_candidates(FakeKrx(), [row("건설", 50, level="비싸요")], set(), date(2026, 11, 23)) == ([], [], [])

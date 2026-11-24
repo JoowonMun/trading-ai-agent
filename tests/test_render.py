@@ -273,3 +273,27 @@ def test_news_section_absent_without_news_or_in_alert():
     ctx = sector_ctx()
     ctx.report_type = "alert"
     assert "이번 주 읽어볼 뉴스" not in render_report(ctx, None, [], news=news_report())
+
+
+def opinion_ctx():
+    from agent.report.schema import Candidate
+    ctx = signal_ctx()          # sectors[2] = 금속 PBR 0.68 하위 12% 싸요, 이익 +91.2%
+    ctx.opinion_sectors = ["금속"]
+    ctx.candidates = [Candidate(ticker="000001", name="가짜제철", sector="금속", method="PBR", value=0.4,
+                                sector_median=0.85, held=True)]
+    return ctx
+
+
+def test_opinion_section_numbers_only():
+    html = render_report(opinion_ctx(), None, [])
+    assert "이번 주 살펴볼 곳" in html and "[금속] PBR 싸요" in html and "하위 12%" in html
+    assert "<strong>가짜제철</strong> 000001" in html and "PBR 0.40 (업종 중간 0.85)" in html and "보유 중" in html
+    assert "사라는 뜻이 아니에요" in html and "후보 기준: 시가총액 상위 300" in html
+    assert html.index("이번 주 살펴볼 곳") < html.index("한눈에 보기")
+
+
+def test_opinion_section_absent_without_sectors_or_in_alert():
+    assert "이번 주 살펴볼 곳" not in render_report(sector_ctx(), None, [])
+    ctx = opinion_ctx()
+    ctx.report_type = "alert"
+    assert "이번 주 살펴볼 곳" not in render_report(ctx, None, [])

@@ -6,6 +6,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from agent.analysis.assessment import assess
+from agent.analysis.candidates import opinion_sectors, pick_candidates
 from agent.analysis.disclosures import classify
 from agent.analysis.financials import build_quarters
 from agent.analysis.fundamentals import compute_fundamentals
@@ -21,14 +22,14 @@ from agent.collectors.dart import disclosure_url
 from agent.collectors.sectors import KR_SECTORS, US_SECTORS
 from agent.collectors.sec13f import normalize_issuer
 from agent.config import Holdings, Settings
-from agent.report.schema import (Context, Disclosure, Flows, HoldingContext, IndexQuote, Market, PositionInfo,
+from agent.report.schema import (Candidate, Context, Disclosure, Flows, HoldingContext, IndexQuote, Market, PositionInfo,
                                  PriceSnapshot, QuietSignal, SectorRow)
 
 log = logging.getLogger(__name__)
 
 GLOSSARY_TERMS = ["PER", "PBR", "ROE", "영업이익률", "매출 성장률", "영업이익 성장률", "부채비율", "배당수익률",
                   "이동평균선", "RSI", "52주 위치", "PER 밴드", "분할매수", "재검토 기준가", "리밸런싱",
-                  "업종 온도계", "이익 방향", "조용한 신호"]
+                  "업종 온도계", "이익 방향", "조용한 신호", "업종 중간값"]
 
 
 KRX_WORKERS = 6
@@ -252,6 +253,26 @@ def _attach_signals(dart, source, sector_rows: list[SectorRow], holdings: set[st
     return signals, more, missing, names
 
 
+def _attach_candidates(source, sector_rows: list[SectorRow], held: set[str],
+                       today: date) -> tuple[list[Candidate], list[str], list[str]]:
+    """살펴볼 곳 업종과 후보 회사. KRX 실패는 후보만 누락으로 표시한다."""
+    targets = opinion_sectors(sector_rows)
+    names = [r.name for r in targets]
+    if not targets:
+        return [], [], []
+    try:
+        day = source.latest_trading_day(today)
+        large = source.market_cap_top(day, LARGE_CAP_COUNT)
+        fundamentals = source.kr_fundamentals_all(day)
+        candidates = [c for r in targets
+                      for c in pick_candidates(r, source.kr_constituents(r.key.split(":")[1], day), large,
+                                               fundamentals, source.ticker_name, held)]
+    except Exception as e:
+        return [], names, [f"후보 회사: {str(e).splitlines()[0]}"]
+    log.info("살펴볼 곳 %d개 업종, 후보 %d개", len(names), len(candidates))
+    return candidates, names, []
+
+
 def build_context(settings: Settings, holdings: Holdings, market, dart, today: date, us=None, nps=None,
                   sec=None, sectors=None) -> Context:
     market_info = _market(market, today)
@@ -318,13 +339,16 @@ def build_context(settings: Settings, holdings: Holdings, market, dart, today: d
         sector_rows, sectors_missing = _attach_sectors(sectors, today)
 
     signals, signals_more, signals_missing, promising = [], 0, [], []
+    candidates, opinion_names, candidates_missing = [], [], []
     if sectors is not None and sector_rows:
         log.info("조용한 신호 수집")
         kr_held = {h.ticker for h in holding_contexts if h.market == "KR"}
         signals, signals_more, signals_missing, promising = _attach_signals(dart, sectors, sector_rows, kr_held, today)
+        candidates, opinion_names, candidates_missing = _attach_candidates(sectors, sector_rows, kr_held, today)
 
     return Context(date=today.isoformat(), profile=settings.profile, market=market_info,
                    holdings=holding_contexts, portfolio=portfolio, glossary_terms=GLOSSARY_TERMS,
                    nps_changes=nps_changes, nps_annual_as_of=nps_as_of, nps_us=nps_us,
                    sectors=sector_rows, sectors_missing=sectors_missing, signals=signals,
-                   signals_more=signals_more, signals_missing=signals_missing, promising_sectors=promising)
+                   signals_more=signals_more, signals_missing=signals_missing, promising_sectors=promising,
+                   opinion_sectors=opinion_names, candidates=candidates, candidates_missing=candidates_missing)
