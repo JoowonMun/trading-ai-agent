@@ -196,6 +196,26 @@ class QuietSignal(BaseModel):
     caution: bool = False
 
 
+class NewsItem(BaseModel):
+    title: str
+    source: str
+    date: str
+    url: str
+
+
+class NewsGroup(BaseModel):
+    kind: Literal["sector", "theme"]
+    name: str
+    query: str
+    items: list[NewsItem] = []
+
+
+class NewsReport(BaseModel):
+    """읽어볼 뉴스 (월요일). 웹에서 온 글이라 해설 AI가 읽는 Context가 아니라 news.json에 따로 둔다."""
+    groups: list[NewsGroup] = []
+    missing: list[str] = []
+
+
 class Context(BaseModel):
     date: str
     profile: Profile

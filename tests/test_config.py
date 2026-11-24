@@ -1,9 +1,10 @@
 from datetime import date, datetime, timezone
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from agent.config import load_holdings, load_settings, today_kst
+from agent.config import Settings, load_holdings, load_settings, today_kst
 
 
 def write(tmp_path, name, text):
@@ -92,3 +93,8 @@ def test_combine_holdings_replaces_manual_nh_accounts():
 def test_settings_index_tickers_default_empty():
     from agent.config import Settings
     assert Settings().index_tickers == []
+
+
+def test_news_themes_default_and_repo_settings():
+    assert "원전" in Settings().news_themes and len(Settings().news_themes) == 8
+    assert load_settings(Path("config/settings.yaml")).news_themes

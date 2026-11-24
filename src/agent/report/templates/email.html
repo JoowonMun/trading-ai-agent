@@ -92,6 +92,18 @@
 {% if context.signals_missing %}<p style="font-size:12px;color:#a8a29e;margin:4px 0 0;">누락: {{ context.signals_missing|join(" · ") }}</p>{% endif %}
 {% endif %}
 
+{% if news and (news.groups or news.missing) %}
+<h2 style="{{ H2 }}">📰 이번 주 읽어볼 뉴스 <span style="font-size:13px;color:#78716c;font-weight:normal;">유망 업종과 테마의 최근 기사</span></h2>
+{% for g in news.groups %}
+<div style="font-size:13px;font-weight:600;margin:12px 0 4px;">[{{ "유망 업종 · " ~ g.name ~ "] " ~ g.query if g.kind == "sector" else "테마 · " ~ g.name ~ "]" }}</div>
+<ul style="font-size:13px;margin:0;padding-left:20px;">
+{% for i in g.items %}<li style="margin:0 0 4px;"><a href="{{ i.url }}" style="color:#2563eb;">{{ i.title }}</a> — {{ i.source }} ({{ i.date[5:]|replace("-", "/") }})</li>
+{% endfor %}</ul>
+{% endfor %}
+<p style="font-size:13px;color:#57534e;margin:8px 0 0;">뉴스는 사고팔 신호가 아니라 흐름을 읽는 재료예요.</p>
+{% if news.missing %}<p style="font-size:12px;color:#a8a29e;margin:4px 0 0;">누락: {{ news.missing|join(" · ") }}</p>{% endif %}
+{% endif %}
+
 {% if context.market.indices or context.market.fx_usdkrw %}
 <h2 style="{{ H2 }}">시장</h2>
 <table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px;">

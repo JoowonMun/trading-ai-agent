@@ -250,3 +250,26 @@ def test_signal_section_absent_when_empty():
     ctx = signal_ctx()
     ctx.report_type = "alert"
     assert "이번 주 조용한 신호" not in render_report(ctx, None, [])
+
+
+def news_report():
+    from agent.report.schema import NewsGroup, NewsItem, NewsReport
+    it = NewsItem(title="가짜중공업 <b>원전</b> 수주", source="가짜신문", date="2026-11-20",
+                  url="https://news.google.com/rss/articles/AAA")
+    return NewsReport(groups=[NewsGroup(kind="sector", name="금속", query="철강 업황", items=[it]),
+                              NewsGroup(kind="theme", name="원전", query="원전", items=[it])],
+                      missing=["뉴스 조선: 막힘"])
+
+
+def test_news_section_in_weekly():
+    html = render_report(sector_ctx(), None, [], news=news_report())
+    assert "이번 주 읽어볼 뉴스" in html and "[유망 업종 · 금속] 철강 업황" in html and "[테마 · 원전]" in html
+    assert "&lt;b&gt;원전" in html and "가짜신문 (11/20)" in html and "누락: 뉴스 조선: 막힘" in html
+    assert 'href="https://news.google.com/rss/articles/AAA"' in html
+
+
+def test_news_section_absent_without_news_or_in_alert():
+    assert "이번 주 읽어볼 뉴스" not in render_report(sector_ctx(), None, [])
+    ctx = sector_ctx()
+    ctx.report_type = "alert"
+    assert "이번 주 읽어볼 뉴스" not in render_report(ctx, None, [], news=news_report())

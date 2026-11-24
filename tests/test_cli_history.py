@@ -131,3 +131,25 @@ def test_apply_history_monday_enriches_us_sectors(tmp_path):
     ctx.sectors = [SectorRow(key="US:XLK", name="기술", market="US", method="PER", value=30.0, close=300.0)]
     cli.apply_history(ctx, Settings(), store, date(2026, 10, 19))
     assert ctx.report_type == "weekly" and ctx.sectors[0].history_weeks == 2
+
+
+class FakeNews:
+    def search(self, query, days=7):
+        return [{"title": f"{query} 소식", "source": "가짜신문", "date": "2026-11-20",
+                 "url": "https://news.google.com/rss/articles/A"}]
+
+
+def test_collect_news_writes_separate_file_not_context(tmp_path):
+    ctx = sample_context()
+    cli.collect_news(Settings(news_themes=["원전"]), ctx, tmp_path, FakeNews(), date(2026, 11, 23))
+    saved = json.loads((tmp_path / "news.json").read_text(encoding="utf-8"))
+    assert saved["groups"][0]["items"][0]["title"] == "원전 소식"
+    assert "원전 소식" not in ctx.model_dump_json()   # 웹에서 온 글은 해설 AI가 읽는 context에 넣지 않는다
+
+
+def test_publish_renders_news_file(tmp_path, monkeypatch):
+    config, day = setup_dirs(tmp_path, "weekly")
+    cli.collect_news(Settings(news_themes=["원전"]), sample_context(), day, FakeNews(), date(2026, 11, 23))
+    monkeypatch.setattr(cli, "send_email", lambda *a: None)
+    cli.main(publish_args(tmp_path, config, "publish"))
+    assert "원전 소식" in (day / "preview.html").read_text(encoding="utf-8")

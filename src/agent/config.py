@@ -32,6 +32,7 @@ class Settings(BaseModel):
     alert_move_pct: float = 5.0  # 직전 기록 대비 이만큼(%) 움직이면 알림
     research_weekly_move_pct: float = 7.0  # 주간 리포트에서 이만큼(%) 움직인 종목은 원인 조사
     research_max: int = 3  # 하루 원인 조사 종목 수 상한
+    news_themes: list[str] = ["AI 반도체", "전력망", "원전", "방산", "2차전지", "바이오", "로봇 산업", "조선업"]
 
     @model_validator(mode="after")
     def _allocation_sums_to_100(self):

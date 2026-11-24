@@ -25,7 +25,7 @@
 | 포트폴리오 | 국내·미국·지수 자산군 비중 vs 목표, 리밸런싱 금액 제안, 단일 종목 쏠림 경고 |
 | 국민연금 | 국내 연간 보유 순위, DART 지분 신고로 최근 변동, 미국 13F 분기 변동(많이 늘린·줄인 종목) |
 | AI 해설 | Claude Code가 계산 결과를 초보자용 문장으로 풀어 씀 — 숫자는 코드가 검증 |
-| 알림·주간 | 평일엔 변화(신호 변경·기준가 통과·±5%·새 공시·국민연금·실적 D-3)가 있을 때만 알림, 월요일엔 지난주 대비와 업종 온도계(국내·미국 업종의 가격 수준·이익 방향·주가 위치)와 조용한 신호(유망 업종·큰 회사의 지난주 주요 공시)가 붙은 주간 리포트. 매일 스냅샷은 비공개 저장소에 기록 |
+| 알림·주간 | 평일엔 변화(신호 변경·기준가 통과·±5%·새 공시·국민연금·실적 D-3)가 있을 때만 알림, 월요일엔 지난주 대비와 업종 온도계(국내·미국 업종의 가격 수준·이익 방향·주가 위치)와 조용한 신호(유망 업종·큰 회사의 지난주 주요 공시)와 읽어볼 뉴스(유망 업종·테마 기사 링크)가 붙은 주간 리포트. 매일 스냅샷은 비공개 저장소에 기록 |
 
 ## 설계에서 신경 쓴 점
 
@@ -61,6 +61,7 @@ GitHub Actions (평일 06:17 KST, 월요일=주간 리포트 / 화~금=변화 �
 | 국민연금 미국 | 13F (SEC가 한국·클라우드 IP를 차단해 13f.info 경유) |
 | 업종 온도계 | KRX 업종 지수 PER·PBR(pykrx), 미국 업종 ETF(yfinance) |
 | 조용한 신호 | DART 시장 전체 공시(`list.json`), KRX 업종 소속 회사·시가총액(pykrx) |
+| 읽어볼 뉴스 | 구글 뉴스 RSS (비공식, 키 없음). 테마는 `config/settings.yaml`의 `news_themes` |
 | 잔고 | NH투자증권 나무 PLUG Open API |
 
 ## 실행
@@ -81,7 +82,7 @@ uv run python -m agent run                     # 수집 → 발송
 
 ```
 src/agent/
-  collectors/   dart · nh · prices · us_fundamentals · nps · sec13f
+  collectors/   dart · nh · prices · us_fundamentals · nps · sec13f · sectors · news
   analysis/     financials · fundamentals · valuation · signals · assessment · portfolio · disclosures · indicators
   report/       context (오케스트레이션) · schema · validate · render · templates/email.html · glossary
   delivery/     email

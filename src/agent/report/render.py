@@ -7,7 +7,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from agent.analysis.sectors import sort_rows
 from agent.report.glossary import GLOSSARY, GLOSSARY_SHORT
-from agent.report.schema import Analysis, Context, HoldingContext
+from agent.report.schema import Analysis, Context, HoldingContext, NewsReport
 
 SIGNAL_LABELS = {"add": "추가매수", "hold": "보유", "trim": "일부매도", "review": "재검토"}
 SIGNAL_COLORS = {"add": "#15803d", "hold": "#57534e", "trim": "#b45309", "review": "#b91c1c"}
@@ -74,7 +74,8 @@ def auto_summary(context: Context) -> list[str]:
     return lines
 
 
-def render_report(context: Context, analysis: Analysis | None, notes: list[str]) -> str:
+def render_report(context: Context, analysis: Analysis | None, notes: list[str],
+                  news: NewsReport | None = None) -> str:
     if context.report_type == "alert":
         template, title = "alert.html", f"투자 알림 {context.date}"
     else:
@@ -88,6 +89,7 @@ def render_report(context: Context, analysis: Analysis | None, notes: list[str])
         alerts_by_ticker=alerts_by_ticker,
         holdings_by_ticker={h.ticker: h for h in context.holdings},
         context=context,
+        news=news,
         sectors_kr=sort_rows([r for r in context.sectors if r.market == "KR"]),
         sectors_us=sort_rows([r for r in context.sectors if r.market == "US"]),
         sector_by_name={r.name: r for r in context.sectors if r.market == "KR"},

@@ -11,10 +11,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from agent.analysis.alerts import detect_alerts
+from agent.analysis.news import build_news
 from agent.analysis.research import pick_research_targets
 from agent.analysis.sectors import enrich_us_from_history
 from agent.analysis.weekly import decide_report_type, weekly_diff
 from agent.collectors.dart import DartClient
+from agent.collectors.news import GoogleNews
 from agent.collectors.nh import NhClient
 from agent.collectors.nps import NpsClient
 from agent.collectors.prices import MarketData
@@ -27,7 +29,7 @@ from agent.history.snapshot import make_snapshot
 from agent.history.store import SnapshotStore
 from agent.report.context import build_context
 from agent.report.render import render_report
-from agent.report.schema import Alert, Context, MoveReason
+from agent.report.schema import Alert, Context, MoveReason, NewsReport
 from agent.report.validate import check_move_reasons, validate_analysis
 
 log = logging.getLogger("agent")
@@ -87,6 +89,13 @@ def apply_history(context: Context, settings: Settings, store, today: date) -> N
     log.info("메일 종류: %s (알림 %d건)", context.report_type, len(context.alerts))
 
 
+def collect_news(settings: Settings, context: Context, day: Path, source, today: date) -> None:
+    """읽어볼 뉴스를 news.json에 저장한다. 웹에서 온 글이라 해설 AI가 읽는 context.json에는 넣지 않는다."""
+    news = build_news(source, context.sectors, settings.news_themes, today)
+    (day / "news.json").write_text(news.model_dump_json(indent=2), encoding="utf-8")
+    log.info("읽어볼 뉴스 %d건 (누락 %d)", sum(len(g.items) for g in news.groups), len(news.missing))
+
+
 def cmd_collect(args) -> Path:
     settings = load_settings(args.config_dir / "settings.yaml")
     notes: list[str] = []
@@ -105,6 +114,8 @@ def cmd_collect(args) -> Path:
     path = day / "context.json"
     path.write_text(context.model_dump_json(indent=2), encoding="utf-8")
     log.info("context 저장: %s", path)
+    if sectors is not None:
+        collect_news(settings, context, day, GoogleNews(), args.date)
     return path
 
 
@@ -136,7 +147,9 @@ def cmd_publish(args) -> Path:
     else:
         notes.append("AI 분석 없음 → 숫자 리포트")
 
-    html = render_report(context, analysis, notes)
+    news_path = day / "news.json"
+    news = NewsReport.model_validate_json(news_path.read_text(encoding="utf-8")) if news_path.exists() else None
+    html = render_report(context, analysis, notes, news=news)
     preview = day / "preview.html"
     preview.write_text(html, encoding="utf-8")
     log.info("미리보기 저장: %s", preview)
