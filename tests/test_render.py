@@ -37,10 +37,10 @@ def test_report_with_analysis_uses_ai_text():
     assert "적정가 근처라 보유" in html
 
 
-def test_summary_table_comes_first():
+def test_summary_table_sits_between_market_and_holdings():
     html = render_report(sample_context(), None, [])
     assert "한눈에 보기" in html
-    assert html.index("한눈에 보기") < html.index("52,846원") < html.index("보유 종목 상세")
+    assert html.index(">시장</h2>") < html.index("한눈에 보기") < html.index("52,846원") < html.index("보유 종목 상세")
 
 
 def test_price_ladder_places_current_price():
