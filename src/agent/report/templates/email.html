@@ -4,7 +4,7 @@
 {%- macro badge(text, color) -%}
 <span style="display:inline-block;padding:2px 8px;border-radius:10px;color:#ffffff;font-size:12px;font-weight:600;white-space:nowrap;background:{{ color }};">{{ text }}</span>
 {%- endmacro -%}
-{% from "_parts.html" import move_reason %}
+{% from "_parts.html" import move_reason, sources %}
 <!doctype html>
 <html lang="ko">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }}</title></head>
@@ -22,10 +22,18 @@
 {% for r in opinion_rows %}{% set picks = context.candidates|selectattr("sector", "equalto", r.name)|list %}
 <div style="border:1px solid #e7e5e4;border-radius:8px;padding:12px;margin:0 0 10px;font-size:13px;">
 <div style="font-weight:600;margin-bottom:4px;">[{{ r.name }}] {{ r.method }} {{ r.level }}{% if r.percentile is not none %} ({% if r.percentile <= 50 %}하위 {{ r.percentile|num(0) }}%{% else %}상위 {{ (100 - r.percentile)|num(0) }}%{% endif %}){% endif %}{% if r.earnings_1y_pct is not none %} · 이익 {% if r.earnings_1y_pct > 200 %}+200% 넘게{% else %}{{ "%+.1f"|format(r.earnings_1y_pct) }}%{% endif %}{% endif %}</div>
+{% set op = opinions.sectors.get(r.name) if opinions else none %}{% if op %}
+<div style="margin:2px 0;"><strong>오를 수 있는 이유:</strong> {{ op.up }}</div>
+<div style="margin:2px 0;"><strong>안 오를 수 있는 이유:</strong> {{ op.down }}</div>
+<div style="margin:2px 0 6px;"><strong>확인할 것:</strong> {{ op.watch }}</div>{% endif %}
 {% if picks %}<div>후보: {% for c in picks %}<strong>{{ c.name }}</strong> {{ c.ticker }} · {{ c.method }} {{ c.value|num(2) }} (업종 중간 {{ c.sector_median|num(2) }}){% if c.held %} · 보유 중{% endif %}{% if not loop.last %} &nbsp;|&nbsp; {% endif %}{% endfor %}</div>
 {% else %}<div style="color:#78716c;">후보: 기준에 맞는 회사가 없어요</div>{% endif %}
+{% if op %}{{ sources(op.sources) }}{% endif %}
 </div>
 {% endfor %}
+{% if opinions %}{% for name, t in opinions.themes.items() %}
+<div style="font-size:13px;margin:0 0 8px;"><strong>[테마 · {{ name }}]</strong> {{ t.view }}{{ sources(t.sources) }}</div>
+{% endfor %}{% endif %}
 <p style="font-size:12px;color:#78716c;margin:4px 0 0;">후보 기준: 시가총액 상위 300 · 흑자 · 같은 업종 회사들의 중간값보다 싼 곳, 시가총액 큰 순.</p>
 {% if context.candidates_missing %}<p style="font-size:12px;color:#a8a29e;margin:4px 0 0;">누락: {{ context.candidates_missing|join(" · ") }}</p>{% endif %}
 {% endif %}

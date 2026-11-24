@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from agent.analysis.alerts import detect_alerts
 from agent.analysis.news import build_news
+from agent.analysis.opinions import build_opinion_prompt, check_opinions, drop_news, numbered_news
 from agent.analysis.research import pick_research_targets
 from agent.analysis.sectors import enrich_us_from_history
 from agent.analysis.weekly import decide_report_type, weekly_diff
@@ -29,7 +30,7 @@ from agent.history.snapshot import make_snapshot
 from agent.history.store import SnapshotStore
 from agent.report.context import build_context
 from agent.report.render import render_report
-from agent.report.schema import Alert, Context, MoveReason, NewsReport
+from agent.report.schema import Alert, Context, MoveReason, NewsReport, Opinions
 from agent.report.validate import check_move_reasons, validate_analysis
 
 log = logging.getLogger("agent")
@@ -147,9 +148,13 @@ def cmd_publish(args) -> Path:
     else:
         notes.append("AI 분석 없음 → 숫자 리포트")
 
-    news_path = day / "news.json"
-    news = NewsReport.model_validate_json(news_path.read_text(encoding="utf-8")) if news_path.exists() else None
-    html = render_report(context, analysis, notes, news=news)
+    news = _load_news(day)
+    opinions_path = day / "opinions.json"
+    opinions = (Opinions.model_validate_json(opinions_path.read_text(encoding="utf-8"))
+                if opinions_path.exists() else None)
+    if news and opinions:
+        news = drop_news(news, opinions.drop_news)
+    html = render_report(context, analysis, notes, news=news, opinions=opinions)
     preview = day / "preview.html"
     preview.write_text(html, encoding="utf-8")
     log.info("미리보기 저장: %s", preview)
@@ -217,6 +222,43 @@ def cmd_research_save(args) -> None:
     log.info("원인 조사 결과: %d종목", len(reasons))
 
 
+def _load_news(day: Path) -> NewsReport | None:
+    path = day / "news.json"
+    return NewsReport.model_validate_json(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+def cmd_opinion_prompt(args) -> None:
+    """살펴볼 곳 의견 담당 AI(웹 도구만 가진 별도 실행)에게 줄 지시문. 대상이 없으면 아무것도 출력하지 않는다."""
+    day = _day_dir(args)
+    context = Context.model_validate_json((day / "context.json").read_text(encoding="utf-8"))
+    guide = Path("prompts/opinion-guide.md").read_text(encoding="utf-8")
+    prompt = build_opinion_prompt(guide, context, _load_news(day))
+    if prompt:
+        print(prompt)
+
+
+def cmd_opinion_save(args) -> None:
+    """의견 담당 AI의 답변(JSON)을 검증해 통과한 항목만 opinions.json으로 저장한다."""
+    day = _day_dir(args)
+    context = Context.model_validate_json((day / "context.json").read_text(encoding="utf-8"))
+    news = _load_news(day)
+    result = json.loads((day / "opinion_raw.json").read_text(encoding="utf-8")).get("result") or ""
+    start, end = result.find("{"), result.rfind("}")
+    try:
+        raw = json.loads(result[start:end + 1]) if start != -1 else {}
+    except ValueError as e:
+        log.warning("업종 의견 해석 실패: %s", type(e).__name__)
+        return
+    if not isinstance(raw, dict):
+        log.warning("업종 의견 해석 실패: 객체가 아님")
+        return
+    themes = [g.name for g in (news.groups if news else []) if g.kind == "theme"]
+    opinions, errors = check_opinions(raw, context.opinion_sectors, themes, len(numbered_news(news)))
+    (day / "opinions.json").write_text(opinions.model_dump_json(indent=2), encoding="utf-8")
+    log.info("업종 의견 %d개 · 테마 %d개 (버림 %d) · 뺀 기사 %d건",
+             len(opinions.sectors), len(opinions.themes), len(errors), len(opinions.drop_news))
+
+
 def cmd_save_snapshot(args) -> None:
     """발송이 끝난 뒤 오늘 스냅샷을 기록 저장소 폴더에 쓴다 (커밋·푸시는 워크플로가 한다)."""
     if not args.history_dir:
@@ -253,7 +295,8 @@ def main(argv: list[str] | None = None) -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     parser = argparse.ArgumentParser(prog="python -m agent")
-    parser.add_argument("command", choices=["collect", "check", "publish", "run", "save-snapshot", "research-prompt", "research-save"])
+    parser.add_argument("command", choices=["collect", "check", "publish", "run", "save-snapshot", "research-prompt", "research-save",
+                                                 "opinion-prompt", "opinion-save"])
     parser.add_argument("--date", type=date.fromisoformat, default=None, help="기준일 (기본: 오늘, 한국시간)")
     parser.add_argument("--out", type=Path, default=Path("out"))
     parser.add_argument("--config-dir", type=Path, default=Path("config"))
@@ -266,7 +309,8 @@ def main(argv: list[str] | None = None) -> None:
 
     commands = {"collect": cmd_collect, "check": cmd_check, "publish": cmd_publish, "run": cmd_run,
                 "save-snapshot": cmd_save_snapshot, "research-prompt": cmd_research_prompt,
-                "research-save": cmd_research_save}
+                "research-save": cmd_research_save, "opinion-prompt": cmd_opinion_prompt,
+                "opinion-save": cmd_opinion_save}
     step = commands[args.command]
     if args.notify_on_error and args.command in ("collect", "publish"):
         step = _notify_on_error(step)

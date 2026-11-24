@@ -153,3 +153,56 @@ def test_publish_renders_news_file(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "send_email", lambda *a: None)
     cli.main(publish_args(tmp_path, config, "publish"))
     assert "원전 소식" in (day / "preview.html").read_text(encoding="utf-8")
+
+
+def opinion_day(tmp_path):
+    from agent.report.schema import Candidate, SectorRow
+    config, day = setup_dirs(tmp_path, "weekly")
+    ctx = sample_context()
+    ctx.report_type = "weekly"
+    ctx.sectors = [SectorRow(key="KR:1011", name="금속", market="KR", method="PBR", value=0.68, percentile=12.0,
+                             level="싸요", earnings_1y_pct=91.2)]
+    ctx.opinion_sectors = ["금속"]
+    ctx.candidates = [Candidate(ticker="000001", name="가짜제철", sector="금속", method="PBR", value=0.4,
+                                sector_median=0.85)]
+    (day / "context.json").write_text(ctx.model_dump_json(), encoding="utf-8")
+    cli.collect_news(Settings(news_themes=["원전"]), ctx, day, FakeNews(), date(2026, 11, 23))
+    return config, day
+
+
+OPINION = {"sectors": {"금속": {"up": "수요가 회복된다는 전망이에요", "down": "수입품이 늘 수 있어요",
+                                "watch": "다음 분기 실적", "sources": ["https://news.example/a"]}},
+           "drop_news": [1]}
+
+
+def test_opinion_prompt_prints_targets(tmp_path, capsys):
+    config, _ = opinion_day(tmp_path)
+    cli.main(publish_args(tmp_path, config, "opinion-prompt"))
+    out = capsys.readouterr().out
+    assert "가짜제철" in out and "원전 소식" in out
+
+
+def test_opinion_save_writes_checked_file(tmp_path):
+    config, day = opinion_day(tmp_path)
+    (day / "opinion_raw.json").write_text(json.dumps({"result": "설명이에요\n" + json.dumps(OPINION, ensure_ascii=False) + "\n끝"}),
+                                          encoding="utf-8")
+    cli.main(publish_args(tmp_path, config, "opinion-save"))
+    saved = json.loads((day / "opinions.json").read_text(encoding="utf-8"))
+    assert list(saved["sectors"]) == ["금속"] and saved["drop_news"] == [1]
+
+
+def test_opinion_save_broken_json_writes_nothing(tmp_path):
+    config, day = opinion_day(tmp_path)
+    (day / "opinion_raw.json").write_text(json.dumps({"result": "{깨진"}), encoding="utf-8")
+    cli.main(publish_args(tmp_path, config, "opinion-save"))
+    assert not (day / "opinions.json").exists()
+
+
+def test_publish_renders_opinions_and_drops_news(tmp_path, monkeypatch):
+    config, day = opinion_day(tmp_path)
+    (day / "opinions.json").write_text(json.dumps(OPINION, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(cli, "send_email", lambda *a: None)
+    cli.main(publish_args(tmp_path, config, "publish"))
+    html = (day / "preview.html").read_text(encoding="utf-8")
+    assert "수요가 회복된다는 전망이에요" in html
+    assert "철강 업황 소식" not in html and "원전 소식" in html   # 1번 기사만 뺀다
