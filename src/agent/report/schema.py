@@ -246,6 +246,27 @@ class NewsReport(BaseModel):
     missing: list[str] = []
 
 
+class SignalScore(BaseModel):
+    """신호 적중 기록: 바뀐 날마다 4주 뒤 같은 시장 지수와 비교 (events에 대기 포함)."""
+    signal: Signal
+    events: int = 0
+    hits: int = 0
+    pending: int = 0
+
+
+class Performance(BaseModel):
+    """성과 (월요일): 계좌 수익률은 비중 × 종목 수익률을 이어 붙여 입출금 영향이 없다."""
+    since: str
+    week_since: str | None = None
+    account_week_pct: float | None = None
+    account_total_pct: float | None = None
+    index_week_pct: dict[str, float] = {}
+    index_total_pct: dict[str, float] = {}
+    scores: list[SignalScore] = []
+    dividend_krw: float | None = None  # 예상 연간 배당 (추정)
+    dividend_missing: list[str] = []
+
+
 class Context(BaseModel):
     date: str
     profile: Profile
@@ -271,6 +292,8 @@ class Context(BaseModel):
     opinion_sectors: list[str] = []  # 살펴볼 곳 업종 (월요일, 유망 업종 중 싼 순 최대 3개)
     candidates: list[Candidate] = []
     candidates_missing: list[str] = []
+    performance: Performance | None = None  # 성과 (월요일)
+    performance_missing: list[str] = []
 
 
 class MoveReason(BaseModel):
