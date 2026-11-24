@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from agent.analysis.alerts import detect_alerts
 from agent.analysis.news import build_news
+from agent.analysis.performance import build_performance
 from agent.analysis.opinions import build_opinion_prompt, check_opinions, drop_news, numbered_news
 from agent.analysis.research import pick_research_targets
 from agent.analysis.sectors import enrich_us_from_history
@@ -82,12 +83,25 @@ def apply_history(context: Context, settings: Settings, store, today: date) -> N
                 context.weekly = weekly_diff(week_prev, context, week_alerts)
             enrich_us_from_history(context.sectors, store.between(today - timedelta(days=365),
                                                                   today - timedelta(days=1)), today)
+            attach_performance(context, store, today)
         context.research_targets = pick_research_targets(context, settings)
     except Exception as e:
         log.warning("기록 저장소 읽기 실패 — 첫 실행처럼 진행: %s", type(e).__name__)
         context.alerts, context.weekly, context.research_targets = [], None, []
         context.report_type = decide_report_type(today, None, [])
     log.info("메일 종류: %s (알림 %d건)", context.report_type, len(context.alerts))
+
+
+def attach_performance(context: Context, store, today: date) -> None:
+    """성과(월요일). 실패해도 성과만 누락으로 표시하고 리포트는 계속한다."""
+    try:
+        snaps = store.between(date(2000, 1, 1), today - timedelta(days=1)) + [make_snapshot(context)]
+        week_since = context.weekly.since if context.weekly else None
+        context.performance = build_performance(snaps, week_since, context)
+    except Exception as e:
+        context.performance = None
+        context.performance_missing = [f"성과: {type(e).__name__}"]
+        log.warning("성과 계산 실패: %s", type(e).__name__)
 
 
 def collect_news(settings: Settings, context: Context, day: Path, source, today: date) -> None:

@@ -47,9 +47,13 @@ def index_return(snaps: list[dict], key: str) -> float | None:
 
 
 def score_signals(snaps: list[dict]) -> list[SignalScore]:
-    """신호가 바뀐 날(처음 붙은 날 포함)마다 28일 뒤 같은 시장 지수와 비교한다."""
+    """신호가 바뀐 날(처음 붙은 날 포함)마다 28일 뒤 같은 시장 지수와 비교한다.
+
+    신호가 며칠 사이 오락가락하면 같은 신호가 28일 안에 다시 붙어도 한 번만 센다.
+    """
     scores = {k: SignalScore(signal=k) for k in SCORED}
     last: dict[tuple, str] = {}
+    counted: dict[tuple, date] = {}
     for i, s in enumerate(snaps):
         for h in s.get("holdings", []):
             key, signal = (h["market"], h["ticker"]), h.get("signal")
@@ -58,7 +62,11 @@ def score_signals(snaps: list[dict]) -> list[SignalScore]:
                 last[key] = signal
             if not changed or signal not in SCORED:
                 continue
-            due = date.fromisoformat(s["date"]) + SCORE_AFTER
+            day = date.fromisoformat(s["date"])
+            if (prev := counted.get((key, signal))) and day - prev < SCORE_AFTER:
+                continue
+            counted[(key, signal)] = day
+            due = day + SCORE_AFTER
             later = next((x for x in snaps[i + 1:] if date.fromisoformat(x["date"]) >= due), None)
             if later is None:
                 scores[signal].events += 1

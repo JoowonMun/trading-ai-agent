@@ -62,6 +62,30 @@
 {% endif %}
 {% endif %}
 
+{% if context.report_type == "weekly" and (context.performance or context.performance_missing) %}
+<h2 style="{{ H2 }}">📈 성과 <span style="font-size:13px;color:#78716c;font-weight:normal;">내 계좌는 시장보다 어땠나</span></h2>
+{% set p = context.performance %}{% if p %}
+{% macro pct(v) %}{% if v is none %}-{% else %}<span style="color:{{ '#15803d' if v > 0 else '#b91c1c' if v < 0 else '#57534e' }};">{{ "%+.1f"|format(v) }}%</span>{% endif %}{% endmacro %}
+<table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px;">
+<tr><th style="{{ TH }}text-align:left;">기간</th><th style="{{ TH }}text-align:right;">내 계좌</th><th style="{{ TH }}text-align:right;">KOSPI</th><th style="{{ TH }}text-align:right;">S&amp;P500</th></tr>
+{% for label, acct, idx in [("지난주 (" ~ (p.week_since or "-") ~ " 이후)", p.account_week_pct, p.index_week_pct), ("기록 시작 (" ~ p.since ~ " 이후)", p.account_total_pct, p.index_total_pct)] %}
+<tr><td style="{{ TD }}">{{ label }}</td><td style="{{ TD }}text-align:right;font-weight:600;">{{ pct(acct) }}</td>
+<td style="{{ TD }}text-align:right;">{{ pct(idx.get("KOSPI")) }}</td><td style="{{ TD }}text-align:right;">{{ pct(idx.get("S&P500")) }}</td></tr>
+{% endfor %}
+</table>
+<p style="font-size:12px;color:#78716c;margin:4px 0 0;">현금 포함 · 종목 비중 × 주가 변화로 계산해서 입금·출금은 수익으로 치지 않아요. 매매가 있던 날은 대략치예요.</p>
+<div style="font-size:13px;font-weight:600;margin:12px 0 4px;">신호 적중 기록 <span style="font-weight:normal;color:#78716c;">(신호가 바뀐 날부터 4주 뒤, 같은 시장 지수와 비교)</span></div>
+{% set shown = p.scores|selectattr("events")|list %}
+<ul style="font-size:13px;margin:0;padding-left:20px;">{% for s in shown %}{% set done = s.events - s.pending %}
+<li>{{ signal_labels[s.signal] }}: {% if done %}{{ done }}번 중 {{ s.hits }}번 지수보다 {{ "나았어요" if s.signal == "add" else "못했어요" }}{% else %}아직 채점할 신호가 없어요{% endif %}{% if s.pending %} (채점 대기 {{ s.pending }}건){% endif %}</li>
+{% else %}<li style="color:#78716c;">아직 신호 기록이 없어요</li>{% endfor %}</ul>
+<p style="font-size:12px;color:#78716c;margin:4px 0 0;">추가매수는 지수보다 나았으면, 일부매도·재검토는 지수보다 못했으면 신호가 맞았던 거예요.</p>
+{% if p.dividend_krw is not none %}<p style="margin:10px 0 0;">예상 연간 배당: 약 <strong>{{ p.dividend_krw|money }}</strong> <span style="font-size:12px;color:#78716c;">(추정 · 지금 평가액 × 배당수익률, 실제 받은 금액이 아니에요)</span></p>{% endif %}
+{% if p.dividend_missing %}<p style="font-size:12px;color:#a8a29e;margin:2px 0 0;">배당 추정에서 빠짐: {{ p.dividend_missing|join(", ") }}</p>{% endif %}
+{% endif %}
+{% if context.performance_missing %}<p style="font-size:12px;color:#a8a29e;margin:4px 0 0;">누락: {{ context.performance_missing|join(" · ") }}</p>{% endif %}
+{% endif %}
+
 {% if context.sectors %}
 <h2 style="{{ H2 }}">🌡️ 업종 온도계 <span style="font-size:13px;color:#78716c;font-weight:normal;">지금 어느 업종이 과거보다 싸고 비싼가</span></h2>
 {% for label, rows, earn in [("국내", sectors_kr, "1y"), ("미국", sectors_us, "3m")] %}{% if rows %}

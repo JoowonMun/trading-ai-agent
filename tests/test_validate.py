@@ -191,3 +191,12 @@ def test_candidate_numbers_allowed():
     raw = analysis()
     raw["market_comment"] = "가짜제철은 PBR 0.4배로 업종 중간 0.85배보다 낮아요"
     assert validate_analysis(raw, ctx)[1] == []
+
+
+def test_performance_numbers_allowed():
+    from agent.report.schema import Performance
+    ctx = sample_context()
+    ctx.performance = Performance(since="2026-10-01", account_total_pct=4.27, index_total_pct={"KOSPI": 2.1})
+    raw = analysis()
+    raw["portfolio_comment"] = "기록 시작 이후 계좌는 +4.3%, 코스피는 +2.1%예요"
+    assert validate_analysis(raw, ctx)[1] == []

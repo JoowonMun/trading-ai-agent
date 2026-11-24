@@ -75,3 +75,11 @@ def test_build_performance_week_and_total():
     assert p.account_week_pct == pytest.approx(5.0) and p.account_total_pct == pytest.approx(15.5)
     assert p.index_week_pct["KOSPI"] == pytest.approx(10.0) and p.index_total_pct["KOSPI"] == pytest.approx(21.0)
     assert p.dividend_krw == 14_000
+
+
+def test_score_signals_ignores_flicker_back_to_same_signal_within_four_weeks():
+    seq = [("2026-10-05", "trim"), ("2026-10-06", "review"), ("2026-10-07", "trim"), ("2026-10-08", "review"),
+           ("2026-11-10", "trim")]
+    snaps = [snap(d, [("KR", "000001", 100.0, 10, s)]) for d, s in seq]
+    scores = {s.signal: s for s in score_signals(snaps)}
+    assert scores["trim"].events == 2 and scores["review"].events == 1  # 10/7 trim·10/8 review는 4주 안 재등장

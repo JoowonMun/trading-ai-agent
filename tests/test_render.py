@@ -316,3 +316,32 @@ def test_opinion_card_shows_sector_warning():
     html = render_report(ctx, None, [])
     card = html[html.index("이번 주 살펴볼 곳"):html.index("한눈에 보기")]
     assert "⚠ 경기 정점일 수 있어요" in card
+
+
+def perf_ctx():
+    from agent.report.schema import Performance, SignalScore
+    ctx = sample_context()
+    ctx.performance = Performance(
+        since="2026-10-01", week_since="2026-10-08", account_week_pct=1.23, account_total_pct=-2.5,
+        index_week_pct={"KOSPI": 0.5}, index_total_pct={"KOSPI": 3.0, "S&P500": 1.0},
+        scores=[SignalScore(signal="add", events=3, hits=1, pending=1), SignalScore(signal="trim"),
+                SignalScore(signal="review", events=1, pending=1)],
+        dividend_krw=14_000, dividend_missing=["가짜ETF"])
+    return ctx
+
+
+def test_performance_section():
+    html = render_report(perf_ctx(), None, [])
+    assert "📈 성과" in html and "+1.2%" in html and "-2.5%" in html and "+3.0%" in html
+    assert "추가매수: 2번 중 1번 지수보다 나았어요 (채점 대기 1건)" in html
+    assert "재검토: 아직 채점할 신호가 없어요 (채점 대기 1건)" in html and "일부매도" not in html.split("📈 성과")[1].split("</ul>")[0]
+    assert "14,000원" in html and "추정" in html and "가짜ETF" in html and "현금 포함" in html
+
+
+def test_performance_missing_and_not_in_alert():
+    ctx = sample_context()
+    ctx.performance_missing = ["성과: OSError"]
+    assert "성과: OSError" in render_report(ctx, None, [])
+    alert = perf_ctx()
+    alert.report_type = "alert"
+    assert "📈 성과" not in render_report(alert, None, [])

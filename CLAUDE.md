@@ -70,7 +70,7 @@ gh workflow run daily-report.yml -f dry_run=true   # Actions 점검 실행
 src/agent/collectors/  dart · nh(잔고, 조회 전용) · prices · us_fundamentals · nps · sec13f(13f.info) · sectors(업종 지수·ETF) · news(구글 뉴스 RSS)
 src/agent/analysis/    financials · fundamentals · valuation · signals · assessment · portfolio
                        · disclosures · indicators · alerts · weekly · research · sectors(업종 온도계) · quiet_signals(조용한 신호) · news(읽어볼 뉴스)
-                       · candidates(살펴볼 곳 후보) · opinions(의견 지시문·검증)
+                       · candidates(살펴볼 곳 후보) · opinions(의견 지시문·검증) · performance(성과)
 src/agent/history/     snapshot · store (비공개 기록 저장소)
 src/agent/report/      context(오케스트레이션) · schema · validate · render · templates/{email,alert}.html · glossary
 src/agent/__main__.py  CLI

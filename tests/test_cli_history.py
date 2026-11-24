@@ -35,6 +35,17 @@ def test_apply_history_monday_weekly(tmp_path):
     ctx = sample_context()
     cli.apply_history(ctx, Settings(), seeded_store(tmp_path, close=60000), date(2026, 10, 19))
     assert ctx.report_type == "weekly" and ctx.weekly.since == "2026-10-14"
+    p = ctx.performance
+    assert (p.since, p.week_since) == ("2026-10-14", "2026-10-14")
+    assert abs(p.account_week_pct - 8.2 * (65000 / 60000 - 1)) < 1e-9 and ctx.performance_missing == []
+
+
+def test_apply_history_performance_failure_only_marks_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "build_performance", lambda *a: (_ for _ in ()).throw(RuntimeError("x")))
+    ctx = sample_context()
+    cli.apply_history(ctx, Settings(), seeded_store(tmp_path, close=60000), date(2026, 10, 19))
+    assert ctx.weekly is not None and ctx.performance is None
+    assert ctx.performance_missing == ["성과: RuntimeError"]
 
 
 def test_apply_history_store_error_treated_as_first_run(tmp_path):
